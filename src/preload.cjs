@@ -39,17 +39,20 @@ contextBridge.exposeInMainWorld("tellerRuntime", {
    */
   secureStorage: {
     get: (key) => {
-      if (typeof key !== "string") throw new TypeError("key must be a string");
+      if (typeof key !== "string")
+        return Promise.reject(new TypeError("key must be a string"));
       return ipcRenderer.invoke("teller:secureStorage:get", key);
     },
     set: (key, value) => {
-      if (typeof key !== "string") throw new TypeError("key must be a string");
+      if (typeof key !== "string")
+        return Promise.reject(new TypeError("key must be a string"));
       if (typeof value !== "string")
-        throw new TypeError("value must be a string");
+        return Promise.reject(new TypeError("value must be a string"));
       return ipcRenderer.invoke("teller:secureStorage:set", key, value);
     },
     delete: (key) => {
-      if (typeof key !== "string") throw new TypeError("key must be a string");
+      if (typeof key !== "string")
+        return Promise.reject(new TypeError("key must be a string"));
       return ipcRenderer.invoke("teller:secureStorage:delete", key);
     },
   },

@@ -32,7 +32,7 @@ let isAppQuitting = false;
  * surface a prominent warning when it is false.
  */
 let cachedDeviceId: string | null = null;
-let deviceIdPersisted = true;
+let deviceIdPersisted = false;
 
 function getDeviceIdFilePath(): string {
   return path.join(app.getPath("userData"), DEVICE_ID_FILE);
@@ -89,10 +89,18 @@ const BLOCKED_KEYS = new Set(["__proto__", "prototype", "constructor"]);
  * Throws if the key is not a string, is a blocked prototype property,
  * or contains characters outside the allowed set.
  */
+/** Returns a safely truncated preview of a key for use in error messages. */
+function keyPreview(key: string): string {
+  const MAX_PREVIEW = 40;
+  return key.length > MAX_PREVIEW ? `${key.slice(0, MAX_PREVIEW)}…` : key;
+}
+
 function validateKey(key: unknown): string {
   if (typeof key !== "string") throw new Error("Storage key must be a string");
-  if (BLOCKED_KEYS.has(key)) throw new Error(`Disallowed storage key: ${key}`);
-  if (!SAFE_KEY_RE.test(key)) throw new Error(`Invalid storage key: ${key}`);
+  if (BLOCKED_KEYS.has(key))
+    throw new Error(`Disallowed storage key: "${keyPreview(key)}"`);
+  if (!SAFE_KEY_RE.test(key))
+    throw new Error(`Invalid storage key: "${keyPreview(key)}"`);
   return key;
 }
 
