@@ -16,8 +16,8 @@ const __dirname = path.dirname(__filename);
 /* -------------------------------------------------------------------------- */
 
 const DEVICE_ID_FILE = "device-id.txt";
-const WINDOW_DEFAULT_WIDTH = 1024;
-const WINDOW_DEFAULT_HEIGHT = 700;
+const WINDOW_DEFAULT_WIDTH = 640;
+const WINDOW_DEFAULT_HEIGHT = 480;
 
 let isAppQuitting = false;
 
@@ -201,8 +201,10 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: WINDOW_DEFAULT_WIDTH,
     height: WINDOW_DEFAULT_HEIGHT,
-    minWidth: 800,
-    minHeight: 600,
+    minWidth: 640,
+    minHeight: 480,
+    alwaysOnTop: true,
+    icon: path.join(__dirname, "..", "build-resources", "icon.ico"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
