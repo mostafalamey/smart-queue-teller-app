@@ -9,6 +9,12 @@ interface TellerRuntimeConfig {
   readonly useMockApi: boolean;
 }
 
+interface TellerDeviceIdStatus {
+  readonly id: string;
+  /** False when the ID could not be written to disk and is ephemeral for this session only. */
+  readonly persisted: boolean;
+}
+
 interface TellerSecureStorage {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<boolean>;
@@ -18,6 +24,7 @@ interface TellerSecureStorage {
 interface TellerRuntime {
   readonly config: TellerRuntimeConfig;
   getDeviceId(): Promise<string>;
+  getDeviceIdStatus(): Promise<TellerDeviceIdStatus>;
   getAppVersion(): Promise<string>;
   readonly secureStorage: TellerSecureStorage;
 }

@@ -13,8 +13,20 @@ export function App() {
     const runtime = window.tellerRuntime;
     if (!runtime) return;
 
-    runtime.getDeviceId().then(setDeviceId);
-    runtime.getAppVersion().then(setAppVersion);
+    runtime
+      .getDeviceId()
+      .then(setDeviceId)
+      .catch((err: unknown) => {
+        console.error("Failed to load device ID from runtime:", err);
+        setDeviceId("Unavailable");
+      });
+    runtime
+      .getAppVersion()
+      .then(setAppVersion)
+      .catch((err: unknown) => {
+        console.error("Failed to load app version from runtime:", err);
+        setAppVersion("Unavailable");
+      });
   }, []);
 
   return (
