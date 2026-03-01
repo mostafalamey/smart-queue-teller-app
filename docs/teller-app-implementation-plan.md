@@ -110,25 +110,25 @@ Before starting Phase 6, the following must be in place:
 
 #### Deliverables
 
-- [ ] Initialize `package.json` with project metadata and scripts
-- [ ] Set up Vite with React + TypeScript plugin
-- [ ] Configure Tailwind CSS and shadcn/ui (port config from admin app)
+- [x] Initialize `package.json` with project metadata and scripts
+- [x] Set up Vite with React + TypeScript plugin
+- [x] Configure Tailwind CSS and shadcn/ui (port config from admin app)
 - [ ] Create Electron main process (`src/main.ts`) with:
   - Window creation (1024×700 default, resizable)
   - Dev server URL loading (`VITE_DEV_SERVER_URL`) or production `dist/index.html`
   - Context isolation enabled, node integration disabled
   - App icon configuration
-- [ ] Create preload script (`src/preload.ts`) exposing `tellerRuntime` bridge:
+- [x] Create preload script (`src/preload.cjs`) exposing `tellerRuntime` bridge:
   - `config` — API base URL, environment flags
   - `secureStorage.set(key, value)` — persist refresh token via `safeStorage`
   - `secureStorage.get(key)` — retrieve refresh token
   - `secureStorage.delete(key)` — clear refresh token
   - `getDeviceId()` — read or generate a persistent device identifier
   - `getAppVersion()` — app version string
-- [ ] Create renderer entry point (`src/renderer/main.tsx` + `App.tsx`)
-- [ ] Set up `electron-builder` config for Windows (NSIS installer)
-- [ ] Set up dev scripts: `dev:web`, `dev:electron`, `dev` (concurrent)
-- [ ] Add `.gitignore`, `tsconfig.json`, `tsconfig.node.json`
+- [x] Create renderer entry point (`src/renderer/main.tsx` + `App.tsx`)
+- [x] Set up `electron-builder` config for Windows (NSIS installer)
+- [x] Set up dev scripts: `dev:web`, `dev:electron`, `dev` (concurrent)
+- [x] Add `.gitignore`, `tsconfig.json`, `tsconfig.node.json`
 - [ ] Verify: Electron window opens, loads React app, hot-reload works
 
 #### Project Structure
@@ -139,7 +139,7 @@ smart-queue-teller-app/
 │   └── src/                          # Existing scaffold (will be replaced)
 ├── src/
 │   ├── main.ts                       # Electron main process
-│   └── preload.ts                    # Context bridge (IPC)
+│   └── preload.cjs                   # Context bridge (IPC, CommonJS required)
 ├── src/renderer/
 │   ├── main.tsx                      # React entry
 │   ├── App.tsx                       # Root component + router

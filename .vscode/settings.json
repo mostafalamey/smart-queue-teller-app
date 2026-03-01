@@ -1,0 +1,10 @@
+{
+  // Disable VS Code's built-in CSS validator — Stylelint handles CSS linting
+  // and the built-in validator does not understand Tailwind v4 at-rules
+  // (@custom-variant, @theme, @apply, @layer, @import).
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore"
+}

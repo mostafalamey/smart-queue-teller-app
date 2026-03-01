@@ -7,18 +7,59 @@ import { useEffect, useState } from "react";
  */
 export function App() {
   const [deviceId, setDeviceId] = useState<string>("...");
+  const [deviceIdPersisted, setDeviceIdPersisted] = useState<boolean>(true);
   const [appVersion, setAppVersion] = useState<string>("...");
 
   useEffect(() => {
     const runtime = window.tellerRuntime;
     if (!runtime) return;
 
-    runtime.getDeviceId().then(setDeviceId);
-    runtime.getAppVersion().then(setAppVersion);
+    runtime
+      .getDeviceIdStatus()
+      .then(({ id, persisted }) => {
+        setDeviceId(id);
+        setDeviceIdPersisted(persisted);
+        if (!persisted) {
+          console.warn(
+            "[device-id] ID is ephemeral — could not be written to disk. " +
+              "Device→station binding will break on next launch.",
+          );
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Failed to load device ID from runtime:", err);
+        setDeviceId("Unavailable");
+      });
+    runtime
+      .getAppVersion()
+      .then(setAppVersion)
+      .catch((err: unknown) => {
+        console.error("Failed to load app version from runtime:", err);
+        setAppVersion("Unavailable");
+      });
   }, []);
 
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-6 bg-background text-foreground">
+      {/* Persistent device ID warning — shown when the ID could not be written  */}
+      {/* to disk and will change on next launch, breaking device→station binding */}
+      {!deviceIdPersisted && (
+        <div
+          role="alert"
+          className="flex w-full max-w-lg items-start gap-3 rounded-lg border border-destructive/60 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <span className="mt-0.5 shrink-0 font-bold">⚠</span>
+          <div>
+            <p className="font-semibold">Device ID not persisted</p>
+            <p className="mt-0.5 text-destructive/80">
+              The device ID could not be saved to disk. A new ID will be
+              generated on next launch, breaking the device → station binding.
+              Contact IT support to resolve the file-system issue.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-3xl font-bold tracking-tight text-primary">
           Smart Queue — Teller
