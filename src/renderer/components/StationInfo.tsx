@@ -2,16 +2,16 @@
  * StationInfo — compact header bar displayed at the top of the teller dashboard
  * once the user is authenticated and the station is bound.
  *
- * Shows: counter code · service name · teller name · connection status dot.
+ * Shows: counter code · service name · teller name · live connection status.
  *
  * The `lang` prop controls which bilingual service/department names to display.
- * Connection status is static green for Phase 6.2; Phase 6.3 wires in the live
- * WebSocket connection state.
+ * Connection status reflects live WebSocket state via ConnectionStatus (Phase 6.3).
  */
 
 import { MonitorDot } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStation } from "../hooks/useStation";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -22,8 +22,6 @@ interface StationInfoProps {
   tellerName?: string;
   /** Current UI language — controls which bilingual names to show. */
   lang?: "en" | "ar";
-  /** Whether the app is connected to the backend WebSocket. Defaults true (Phase 6.2 placeholder). */
-  connected?: boolean;
   className?: string;
 }
 
@@ -34,7 +32,6 @@ interface StationInfoProps {
 export function StationInfo({
   tellerName,
   lang = "en",
-  connected = true,
   className,
 }: StationInfoProps) {
   const { binding } = useStation();
@@ -83,19 +80,7 @@ export function StationInfo({
             {tellerName}
           </span>
         )}
-        <div className="flex items-center gap-1.5" title={connected ? "Connected" : "Disconnected"}>
-          <span
-            className={cn(
-              "h-2 w-2 rounded-full",
-              connected
-                ? "bg-green-500 shadow-[0_0_6px_0px_oklch(0.72_0.2_143)]"
-                : "bg-destructive",
-            )}
-          />
-          <span className="text-[10px] text-muted-foreground">
-            {connected ? "Live" : "Offline"}
-          </span>
-        </div>
+        <ConnectionStatus />
       </div>
     </header>
   );

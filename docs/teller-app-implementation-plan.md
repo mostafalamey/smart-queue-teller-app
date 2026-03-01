@@ -262,11 +262,11 @@ Fixes applied after PR review before merge:
 
 #### Deliverables
 
-- [ ] **Device ID generation and persistence** (main process):
+- [x] **Device ID generation and persistence** (main process):
   - Generate UUID on first run, persist to app data directory
   - Expose via `tellerRuntime.getDeviceId()` IPC
   - Display Device ID prominently for IT setup (login screen footer or settings panel)
-- [ ] **Station resolution flow** (post-login):
+- [x] **Station resolution flow** (post-login):
   - Backend returns `stationId` embedded in JWT from the login `stationId` parameter
   - The teller app passes `stationId` = the counter station ID mapped to this Device ID
   - **Resolution sequence:**
@@ -275,17 +275,17 @@ Fixes applied after PR review before merge:
     3. If no device registered or no station assigned → show "Device Not Configured" screen with Device ID for IT to register
     4. If station found → query `GET /stations/:stationId` (or embed in device response) to get `serviceId`, `counterCode`
     5. Proceed to login with `stationId` parameter
-- [ ] **Station info display** (`components/StationInfo.tsx`):
+- [x] **Station info display** (`components/StationInfo.tsx`):
   - Counter code (e.g., "Counter C01")
   - Service name (Arabic/English)
   - Department name (Arabic/English)
   - Teller name (logged-in user)
   - Connection status indicator
-- [ ] **"Device Not Configured" screen**:
+- [x] **"Device Not Configured" screen**:
   - Shows the Device ID for the user to communicate to IT
   - Clear instructions: "Please ask IT to register this device in the Admin app"
   - Retry button to re-check binding
-- [ ] **Session bootstrap sequence** (after login + station resolved):
+- [x] **Session bootstrap sequence** (after login + station resolved):
   1. Fetch current queue summary for bound service
   2. Establish WebSocket connection
   3. Subscribe to service and station rooms
@@ -311,21 +311,21 @@ Fixes applied after PR review before merge:
 
 #### Deliverables
 
-- [ ] **Queue data provider** (`data/teller-provider.ts`):
+- [x] **Queue data provider** (`data/teller-provider.ts`):
   - `getQueueSummary(serviceId)` → waiting count, in-progress count, now-serving info
   - `getWaitingTickets(serviceId)` → list of waiting tickets (ordered by priority + FIFO)
   - Error handling with typed error codes
-- [ ] **Socket connection hook** (`hooks/useSocket.ts`):
+- [x] **Socket connection hook** (`hooks/useSocket.ts`):
   - Connect to `/realtime/socket.io` with auth token
   - Auto-reconnect on disconnect with exponential backoff
   - Subscribe to `service:{serviceId}` and `station:{stationId}` rooms
   - Re-subscribe on reconnection
   - Expose connection state: `connected`, `connecting`, `disconnected`
-- [ ] **Socket context** (`providers/SocketContext.tsx`):
+- [x] **Socket context** (`providers/SocketContext.tsx`):
   - Manages Socket.IO lifecycle tied to auth state
   - Disconnect on logout
   - Reconnect on token refresh
-- [ ] **Queue dashboard** (`components/QueueDashboard.tsx`):
+- [x] **Queue dashboard** (`components/QueueDashboard.tsx`):
   - **Summary cards:**
     - Waiting count (badge with count)
     - In-progress / currently serving
@@ -343,11 +343,15 @@ Fixes applied after PR review before merge:
     - Time waiting (relative)
     - Ordered by: priority desc → createdAt asc
   - Auto-refresh on `queue.updated` and `now-serving.updated` WebSocket events
-- [ ] **Connection status indicator** (`components/ConnectionStatus.tsx`):
+- [x] **Connection status indicator** (`components/ConnectionStatus.tsx`):
   - Green dot = connected
   - Yellow dot = reconnecting
   - Red dot = disconnected
   - Tooltip with last connected time
+- [x] **Backend queue endpoints** (`smart-queue-backend/src/api/server.ts`):
+  - `GET /queue/services/:serviceId/summary` — waiting/called/serving counts + nowServing (station-scoped) + completedToday + noShowsToday
+  - `GET /queue/services/:serviceId/waiting` — WAITING tickets ordered priority desc, FIFO within priority (max 100)
+  - Phone numbers masked server-side via `maskPhone()` helper
 
 #### Real-Time Update Flow
 
@@ -845,8 +849,8 @@ Update this table as implementation proceeds.
 |---|---|---|---|---|
 | 6.0 | Project Scaffold & Electron Shell | Done | 2026-02-28 | 2026-02-28 |
 | 6.1 | Authentication & Token Management | Done | 2026-03-01 | 2026-03-01 |
-| 6.2 | Station Binding & Session Bootstrap | Not Started | | |
-| 6.3 | Queue Dashboard & Real-Time Updates | Not Started | | |
+| 6.2 | Station Binding & Session Bootstrap | Done | 2026-03-01 | 2026-03-01 |
+| 6.3 | Queue Dashboard & Real-Time Updates | Done | 2026-03-01 | 2026-03-01 |
 | 6.4 | Teller Action Panel (Core Operations) | Not Started | | |
 | 6.5 | Transfer Flow | Not Started | | |
 | 6.6 | Keyboard Shortcuts & Peripheral Support | Not Started | | |

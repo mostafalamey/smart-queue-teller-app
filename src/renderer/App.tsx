@@ -17,6 +17,7 @@
 
 import { AuthProvider } from "./providers/AuthContext";
 import { StationProvider, useStation } from "./providers/StationContext";
+import { SocketProvider } from "./providers/SocketContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
 import { ForcePasswordChange } from "./components/ForcePasswordChange";
@@ -24,6 +25,7 @@ import { DeviceNotConfigured } from "./components/DeviceNotConfigured";
 // Note: DeviceNotConfigured is rendered in AuthBridge (outside AuthProvider) so
 // unregistered/error devices never trigger a silent-refresh bootstrap.
 import { StationInfo } from "./components/StationInfo";
+import { QueueDashboard } from "./components/QueueDashboard";
 import { Spinner } from "./components/ui/spinner";
 import { MonitorDot } from "lucide-react";
 
@@ -59,21 +61,14 @@ function TellerApp() {
   /* Must change password before proceeding */
   if (user?.mustChangePassword) return <ForcePasswordChange />;
 
-  /* ---- Authenticated — queue dashboard (Phase 6.3 placeholder) --------- */
+  /* ---- Authenticated — queue dashboard ---------------------------------- */
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <StationInfo tellerName={user?.email} />
-      <main className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm font-medium text-foreground">
-            Queue dashboard
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Coming in Phase 6.3
-          </p>
-        </div>
-      </main>
-    </div>
+    <SocketProvider>
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <StationInfo tellerName={user?.email} />
+        <QueueDashboard />
+      </div>
+    </SocketProvider>
   );
 }
 
