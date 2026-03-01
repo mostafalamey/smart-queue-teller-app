@@ -113,7 +113,7 @@ Before starting Phase 6, the following must be in place:
 - [x] Initialize `package.json` with project metadata and scripts
 - [x] Set up Vite with React + TypeScript plugin
 - [x] Configure Tailwind CSS and shadcn/ui (port config from admin app)
-- [ ] Create Electron main process (`src/main.ts`) with:
+- [x] Create Electron main process (`src/main.ts`) with:
   - Window creation (1024×700 default, resizable)
   - Dev server URL loading (`VITE_DEV_SERVER_URL`) or production `dist/index.html`
   - Context isolation enabled, node integration disabled
@@ -129,7 +129,7 @@ Before starting Phase 6, the following must be in place:
 - [x] Set up `electron-builder` config for Windows (NSIS installer)
 - [x] Set up dev scripts: `dev:web`, `dev:electron`, `dev` (concurrent)
 - [x] Add `.gitignore`, `tsconfig.json`, `tsconfig.node.json`
-- [ ] Verify: Electron window opens, loads React app, hot-reload works
+- [x] Verify: Electron window opens, loads React app, hot-reload works
 
 #### Project Structure
 
@@ -195,35 +195,35 @@ smart-queue-teller-app/
 
 #### Deliverables
 
-- [ ] **Auth data provider** (`data/auth-provider.ts`):
+- [x] **Auth data provider** (`data/auth-provider.ts`):
   - `login({ email, password, stationId, requestedRole })` → tokens + user info
   - `refresh({ refreshToken, stationId })` → rotated tokens
   - `logout({ refreshToken })` → invalidation
   - Request timeout handling (8s default)
-- [ ] **Auth context** (`providers/AuthContext.tsx`):
+- [x] **Auth context** (`providers/AuthContext.tsx`):
   - Stores access token in memory (React state)
   - Stores refresh token via IPC → Electron `safeStorage` (encrypted on disk)
   - On app launch: attempt to read stored refresh token → silent refresh
   - Auto-refresh before access token expiry (proactive refresh at 80% TTL)
   - Exposes: `user`, `isAuthenticated`, `isLoading`, `login()`, `logout()`
   - On logout: clear memory + secure storage + redirect to login
-- [ ] **Login screen** (`components/LoginForm.tsx`):
+- [x] **Login screen** (`components/LoginForm.tsx`):
   - Email + password fields
   - "Sign In" button with loading state
   - Error display (invalid credentials, account locked, network error)
   - Station ID display (read-only, from device)
   - App version in footer
   - Bilingual labels (Arabic/English toggle)
-- [ ] **API client with auth interceptor** (`data/api-client.ts`):
+- [x] **API client with auth interceptor** (`data/api-client.ts`):
   - Attaches `Authorization: Bearer <accessToken>` to all requests
   - On 401 response: attempt token refresh; if refresh fails → force logout
-  - Queues concurrent requests during refresh to avoid race conditions
+  - Queues concurrent requests during refresh to avoid race conditions (shared `refreshPromise`)
   - Configurable base URL from `tellerRuntime.config.apiBaseUrl`
-- [ ] **Force password change screen** (if `user.mustChangePassword === true`):
-  - Current password + new password + confirm
+- [x] **Force password change screen** (`components/ForcePasswordChange.tsx`) (if `user.mustChangePassword === true`):
+  - Current password + new password + confirm (with strength bar)
   - Calls `POST /auth/change-password`
-  - On success: re-login with new password
-- [ ] **Account lockout handling**:
+  - On success: `mustChangePassword` cleared → router shows dashboard
+- [x] **Account lockout handling**:
   - Display lockout message with remaining time when server returns 423
 
 #### Security Requirements
@@ -238,6 +238,21 @@ smart-queue-teller-app/
 - Access token auto-refreshes before expiry.
 - App restart with stored refresh token auto-logs in.
 - Logout clears all state and returns to login screen.
+
+#### Post-Review Hardening (2026-03-01)
+
+Fixes applied after PR review before merge:
+
+- [x] **`API_BASE_URL` required in production** (`main.ts`): production startup exits with a user-visible dialog instead of silently falling back to `localhost` in the CSP.
+- [x] **CSP enforced for `file://` loads** (`main.ts`): replaced `session.webRequest.onHeadersReceived` (skipped for `file://`) with `protocol.handle('file', …)` so the CSP is injected on HTML responses for packaged builds; dev still uses `onHeadersReceived` for the Vite HTTP server.
+- [x] **Dev CSP includes `'unsafe-inline'`** (`main.ts`): required for `@vitejs/plugin-react` Fast Refresh preamble; production CSP remains strict.
+- [x] **`asChild` removed from `ButtonProps`** (`components/ui/button.tsx`): was declared but never implemented — would have leaked onto DOM `<button>` attributes.
+- [x] **`toApiErrorCode()` type guard in `auth-provider.ts`**: validates `body.code` against the full `ApiErrorCode` union before throwing; unrecognised codes fall back to `"UNKNOWN"` instead of passing through an unsafe cast.
+- [x] **`toApiErrorCode()` type guard in `api-client.ts`**: same pattern applied to `parseErrorResponse()` to replace the unsafe `as ApiErrorCode` assertion.
+- [x] **Proactive refresh timer error handler** (`providers/AuthContext.tsx`): `.catch()` added to the timer callback — on failure it logs, clears the timer, wipes the stale stored token, and resets state to unauthenticated.
+- [x] **Bootstrap silent-refresh failure handling** (`providers/AuthContext.tsx`): catch block now clears the timer, nulls the access token ref, deletes the stale stored key, and logs the error instead of swallowing it.
+- [x] **Full optional chaining on `secureStorage` calls** (`providers/AuthContext.tsx`): all six `window.tellerRuntime?.secureStorage.method()` call-sites updated to `?.secureStorage?.method()` so the app doesn't throw when running in `dev:web` (no Electron runtime).
+- [x] **`SESSION_EXPIRED` error code introduced** (`data/types.ts`, `data/auth-provider.ts`, `providers/AuthContext.tsx`, `components/LoginForm.tsx`): replaces `FORBIDDEN` for forced-logout/session-expiry paths so `resolveErrorMessage()` shows the correct "session expired" banner instead of the "no teller access" message.
 
 ---
 
@@ -825,7 +840,7 @@ Update this table as implementation proceeds.
 | Sub-Phase | Description | Status | Start Date | Done Date |
 |---|---|---|---|---|
 | 6.0 | Project Scaffold & Electron Shell | Done | 2026-02-28 | 2026-02-28 |
-| 6.1 | Authentication & Token Management | Not Started | | |
+| 6.1 | Authentication & Token Management | Done | 2026-03-01 | 2026-03-01 |
 | 6.2 | Station Binding & Session Bootstrap | Not Started | | |
 | 6.3 | Queue Dashboard & Real-Time Updates | Not Started | | |
 | 6.4 | Teller Action Panel (Core Operations) | Not Started | | |
