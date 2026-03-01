@@ -67,7 +67,8 @@
       "dist/**/*",
       "src/main.ts",
       "src/preload.cjs",
-      "package.json"
+      "package.json",
+      "build-resources/**/*"
     ],
     "win": {
       "target": [

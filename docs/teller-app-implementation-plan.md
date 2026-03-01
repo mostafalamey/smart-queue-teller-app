@@ -33,14 +33,14 @@ Branch: `feature/teller-desktop-v1`
 
 ## Overview
 
-The Teller App is an **Electron-wrapped desktop application** for hospital Staff users. It provides the teller with a compact, focused interface to execute queue operations: calling the next patient, recalling, starting service, skipping (no-show), completing, and transferring tickets. The app runs on Windows PCs at teller counters, each bound to a specific `CounterStation` and its assigned service.
+The Teller App is an **Electron-wrapped desktop application** for hospital Staff users. It provides the teller with a compact, focused interface to execute queue operations: calling the next patient, recalling, skipping (no-show), completing, and transferring tickets. The app runs on Windows PCs at teller counters, each bound to a specific `CounterStation` and its assigned service.
 
 ### Key Behavioral Requirements (from `smart-queue-plan.md`)
 
 - Staff sign in with email + password credentials.
 - The PC is bound to a counter/station via a Device ID (configured by IT in Admin app).
 - After login, the teller operates the service queue bound to their counter — **no manual service switching in v1**.
-- Actions: Call Next, Recall, Skip (No-show), Start Serving, Complete, Transfer.
+- Actions: Call Next, Recall, Skip (No-show), Complete, Transfer.
 - Keyboard shortcuts for all primary actions to support USB HID peripherals.
 - Real-time queue updates via WebSocket.
 - Refresh token stored in OS secure storage; access token kept in memory.
@@ -375,45 +375,45 @@ Backend teller mutation
 #### Deliverables
 
 - [ ] **Teller API methods** (in `data/teller-provider.ts`):
-  - `callNext(serviceId)` → `POST /teller/call-next` → returns called ticket
-  - `recall(ticketId)` → `POST /teller/recall` → returns recalled ticket
-  - `startServing(ticketId)` → `POST /teller/start-serving` → returns ticket
+  - `callNext(serviceId)` → `POST /teller/call-next` then immediately fires `POST /teller/start-serving` (silent auto-transition, see below)
+  - `recall(ticketId)` → `POST /teller/recall` then immediately fires `POST /teller/start-serving` (silent — resets serving timer)
   - `skipNoShow(ticketId)` → `POST /teller/skip-no-show` → returns ticket
   - `complete(ticketId)` → `POST /teller/complete` → returns ticket
   - All methods use the authenticated API client
+  - `startServing(ticketId)` is an **internal-only** helper; never exposed as a button or shortcut
+- [ ] **Auto-transition design** (silent `CALLED → SERVING`):
+  - After `callNext` succeeds: immediately call `startServing(ticket.id)` in the background before updating UI state
+  - After `recall` succeeds: immediately call `startServing(ticket.id)` to record a fresh `servingStartedAt`
+  - If `startServing` fails silently: log the error; the ticket stays `CALLED` internally but the teller still sees it displayed as active — expose a fallback "Resume" action when the ticket state is detected as `CALLED` so the teller can manually retry
+  - The `CALLED` state is **not rendered** as a distinct visual state — the teller always sees the ticket as SERVING
 - [ ] **Action Panel** (`components/ActionPanel.tsx`):
   - **Call Next** button:
-    - Enabled when: no ticket currently CALLED/SERVING at this station
-    - On click: calls `callNext(serviceId)`
-    - On success: display the called ticket prominently
+    - Enabled when: no active ticket at this station
+    - On click: calls `callNext(serviceId)` → auto-fires `startServing` silently
+    - On success: ticket displayed immediately as SERVING (never shows CALLED state)
     - On empty queue: show "No tickets waiting" feedback
     - Visual: primary/green color, largest button
-  - **Start Serving** button:
-    - Enabled when: current ticket status is `CALLED`
-    - Transitions ticket to `SERVING`
-    - Visual: blue color
   - **Recall** button:
-    - Enabled when: current ticket status is `CALLED` or `SERVING`
-    - Re-announces the ticket (signage/audio)
-    - Does NOT change ticket status
+    - Enabled when: active ticket is present
+    - Re-announces the ticket (signage/audio) and silently re-fires `startServing` to record a fresh serving start timestamp
+    - Serving timer resets to the recalled-at moment
     - Visual: amber/warning color
   - **Skip / No-Show** button:
-    - Enabled when: current ticket status is `CALLED` or `SERVING`
+    - Enabled when: active ticket is present
     - Shows confirmation dialog: "Mark ticket {number} as no-show?"
     - On confirm: marks ticket as `NO_SHOW` (terminal)
     - On success: clears current ticket, ready for next call
     - Visual: red/destructive color
   - **Complete** button:
-    - Enabled when: current ticket status is `SERVING`
-    - Shows brief confirmation or direct action (configurable)
-    - On confirm: marks ticket as `COMPLETED` (terminal)
-    - On success: clears current ticket, ready for next call
+    - Enabled when: active ticket is present
+    - Direct action (no confirmation)
+    - On success: marks ticket as `COMPLETED` (terminal), clears current ticket
     - Visual: green/success color
 - [ ] **Current Ticket Card** (`components/CurrentTicket.tsx`):
   - Large ticket number display
-  - Status badge with color (CALLED → amber, SERVING → blue)
+  - Status badge — always shown as SERVING (CALLED is a transient backend state, never displayed)
   - Priority badge
-  - Timer showing elapsed time since called/serving started
+  - **Serving timer**: counts elapsed time from `calledAt`; resets to the `occurredAt` timestamp of the most recent `RECALLED` event when the ticket has been recalled
   - Patient phone (partially masked)
   - Action buttons contextually arranged below the ticket
 - [ ] **Action feedback**:
@@ -428,11 +428,13 @@ Backend teller mutation
 
 #### Action State Matrix
 
-| Current State | Call Next | Start Serving | Recall | Skip | Complete | Transfer |
-|---|---|---|---|---|---|---|
-| No active ticket | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Ticket CALLED | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Ticket SERVING | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+> `CALLED` is a transient backend state not visible to the teller. After `callNext` or `recall`, `startServing` fires silently so the ticket always appears as SERVING in the UI.
+
+| Current State | Call Next | Recall | Skip | Complete | Transfer |
+|---|---|---|---|---|---|
+| No active ticket | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Ticket active (SERVING) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Ticket CALLED (auto-serving failed, fallback) | ❌ | ✅ (retries startServing) | ✅ | ❌ | ✅ |
 
 #### Error Handling
 
@@ -446,9 +448,11 @@ Backend teller mutation
 | Network error | "Connection lost — retrying..." | Auto-retry with backoff |
 
 #### Done Criteria
-- All five core actions (Call Next, Start Serving, Recall, Skip, Complete) work end-to-end.
+- All four core actions (Call Next, Recall, Skip, Complete) work end-to-end.
+- `startServing` fires automatically after `callNext` and `recall` — teller never sees a CALLED state.
+- Serving timer counts from `calledAt` and resets on recall.
 - Action buttons enable/disable correctly based on current ticket state.
-- Confirmation dialogs appear for destructive actions (Skip).
+- Confirmation dialog appears for Skip.
 - WebSocket events refresh the UI after actions.
 - Error states display meaningful messages.
 
@@ -509,11 +513,10 @@ Backend teller mutation
   ```typescript
   export const SHORTCUTS = {
     CALL_NEXT:     { key: 'F1', label: 'F1' },
-    START_SERVING: { key: 'F2', label: 'F2' },
-    RECALL:        { key: 'F3', label: 'F3' },
-    SKIP_NO_SHOW:  { key: 'F4', label: 'F4' },
-    COMPLETE:      { key: 'F5', label: 'F5' },
-    TRANSFER:      { key: 'F6', label: 'F6' },
+    RECALL:        { key: 'F2', label: 'F2' },
+    SKIP_NO_SHOW:  { key: 'F3', label: 'F3' },
+    COMPLETE:      { key: 'F4', label: 'F4' },
+    TRANSFER:      { key: 'F5', label: 'F5' },
   } as const;
   ```
 - [ ] **Keyboard shortcut hook** (`hooks/useKeyboardShortcuts.ts`):
@@ -539,7 +542,7 @@ Backend teller mutation
 - Physical keypads can be mapped to F-keys via the keypad's firmware or key remapping software.
 
 #### Done Criteria
-- All six actions triggerable via keyboard shortcuts.
+- All five actions triggerable via keyboard shortcuts.
 - Shortcuts respect current enable/disable state.
 - Shortcut labels visible on action buttons.
 - F5 does NOT refresh the Electron page.
@@ -627,7 +630,7 @@ Backend teller mutation
   - **Manual test scenarios:**
     - Fresh install on unregistered device → setup screen
     - Login with force-change-password → change → dashboard
-    - Full ticket lifecycle: Call → Start Serving → Complete
+    - Full ticket lifecycle: Call → Complete (serving auto-starts on call)
     - Transfer to another service
     - Concurrent tellers on same service (one wins call-next)
     - Network disconnect → reconnect → state recovery
@@ -673,9 +676,8 @@ interface TellerDataProvider {
   getWaitingTickets(serviceId: string): Promise<QueueTicket[]>;
 
   // Teller actions
-  callNext(serviceId: string): Promise<QueueTicket>;
-  recall(ticketId: string): Promise<QueueTicket>;
-  startServing(ticketId: string): Promise<QueueTicket>;
+  callNext(serviceId: string): Promise<QueueTicket>;         // also fires startServing internally
+  recall(ticketId: string): Promise<QueueTicket>;            // also re-fires startServing internally
   skipNoShow(ticketId: string): Promise<QueueTicket>;
   complete(ticketId: string): Promise<QueueTicket>;
   transfer(ticketId: string, destination: TransferDestination): Promise<TransferResult>;
@@ -763,15 +765,15 @@ Status codes: 400 (bad request), 401 (unauthorized), 403 (forbidden), 404 (not f
 | Key | Action | Condition |
 |---|---|---|
 | **F1** | Call Next | No active ticket at this station |
-| **F2** | Start Serving | Current ticket is CALLED |
-| **F3** | Recall | Current ticket is CALLED or SERVING |
-| **F4** | Skip / No-Show | Current ticket is CALLED or SERVING |
-| **F5** | Complete | Current ticket is SERVING |
-| **F6** | Transfer | Current ticket is CALLED or SERVING |
+| **F2** | Recall | Active ticket present |
+| **F3** | Skip / No-Show | Active ticket present |
+| **F4** | Complete | Active ticket present (SERVING) |
+| **F5** | Transfer | Active ticket present |
 | **F12** | Show shortcut reference | Always |
 | **Escape** | Close open dialog/modal | When dialog is open |
 
 > F-keys prevent default browser behavior (no page refresh on F5).
+> Start Serving is not a user-facing action — it fires automatically after Call Next and Recall.
 
 ---
 
@@ -789,6 +791,8 @@ WAITING  ──→  CALLED  ──→  SERVING  ──→  COMPLETED
   └──→ CANCELLED (patient/admin only)
   └──→ TRANSFERRED_OUT (from waiting, rare for teller flow)
 ```
+
+> **Teller app note:** `CALLED` is a transient state. After `callNext` or `recall`, the app immediately fires `POST /teller/start-serving`, so the ticket transitions to `SERVING` before the UI renders it. The `CALLED` state is never displayed to the teller under normal operation. Serving time is measured from `calledAt` (set by the backend on `callNext`); after a recall, the timer resets to the `occurredAt` of the latest `RECALLED` event.
 
 ### Status Display Colors
 
@@ -829,7 +833,7 @@ WAITING  ──→  CALLED  ──→  SERVING  ──→  COMPLETED
 | 4 | **LED display adapter**: Should teller app drive above-teller LED? | (a) Teller app drives via serial/USB module, (b) Separate adapter service | **Deferred to Phase 7** — signage phase |
 | 5 | **Language toggle persistence**: Where to store preference? | (a) localStorage, (b) User profile on backend | **Option (a)** — localStorage in renderer |
 | 6 | **Mock provider scope**: How complete should mock be? | (a) Full lifecycle simulation, (b) Static responses only | **Option (a)** — enables parallel UI dev |
-| 7 | **Start Serving step**: Mandatory or optional? | (a) Mandatory explicit step, (b) Auto-serve on call | **Option (a)** — per domain model, CALLED and SERVING are separate states for analytics |
+| 7 | **Start Serving step**: Mandatory or optional? | (a) Mandatory explicit step, (b) Auto-serve on call | **Option (b)** — `start-serving` fires automatically after `callNext` and `recall`; teller never sees CALLED state. Backend still records `servingStartedAt` (~0ms gap) so the event history and WhatsApp notifications are unaffected. Trade-off: `calledAt → servingStartedAt` walk-up time delta is lost in analytics (always ~0ms). |
 
 ---
 

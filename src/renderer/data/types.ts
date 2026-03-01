@@ -131,6 +131,22 @@ export interface CounterStation {
   department?: Department;
 }
 
+/**
+ * Resolved device → counter station binding.
+ * Returned by GET /teller/station?deviceId=<uuid>
+ */
+export interface StationBinding {
+  stationId: string;
+  counterCode: string;
+  serviceId: string;
+  serviceNameEn: string;
+  serviceNameAr: string;
+  ticketPrefix: string;
+  departmentId: string;
+  departmentNameEn: string;
+  departmentNameAr: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Transfer                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -196,9 +212,8 @@ export interface TellerDataProvider {
   getWaitingTickets(serviceId: string): Promise<WaitingTicket[]>;
 
   /* Teller actions */
-  callNext(serviceId: string): Promise<QueueTicket>;
-  recall(ticketId: string): Promise<QueueTicket>;
-  startServing(ticketId: string): Promise<QueueTicket>;
+  callNext(serviceId: string): Promise<QueueTicket>;         // also fires startServing internally
+  recall(ticketId: string): Promise<QueueTicket>;            // also re-fires startServing internally
   skipNoShow(ticketId: string): Promise<QueueTicket>;
   complete(ticketId: string): Promise<QueueTicket>;
   transfer(input: TransferInput): Promise<TransferResult>;

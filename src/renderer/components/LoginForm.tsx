@@ -11,6 +11,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Globe, MonitorDot, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useStation } from "../hooks/useStation";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -117,12 +118,11 @@ function resolveErrorMessage(
 
 export function LoginForm() {
   const { login, isLoading, error, clearError } = useAuth();
+  const { binding, deviceIdPersisted } = useStation();
   const [lang, setLang] = useState<Lang>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [deviceId, setDeviceId] = useState<string>("");
-  const [deviceIdPersisted, setDeviceIdPersisted] = useState(true);
   const [appVersion, setAppVersion] = useState("");
   const emailRef = useRef<HTMLInputElement>(null);
 
@@ -133,19 +133,7 @@ export function LoginForm() {
   useEffect(() => {
     const runtime = window.tellerRuntime;
     if (!runtime) return;
-
-    runtime
-      .getDeviceIdStatus()
-      .then(({ id, persisted }) => {
-        setDeviceId(id);
-        setDeviceIdPersisted(persisted);
-      })
-      .catch(() => setDeviceId("unavailable"));
-
-    runtime
-      .getAppVersion()
-      .then(setAppVersion)
-      .catch(() => setAppVersion(""));
+    runtime.getAppVersion().then(setAppVersion).catch(() => setAppVersion(""));
   }, []);
 
   /* ---- Focus email on mount ------------------------------------------- */
@@ -173,6 +161,7 @@ export function LoginForm() {
       email: email.trim().toLowerCase(),
       password,
       requestedRole: "STAFF",
+      stationId: binding?.stationId,
     }).catch(() => {
       /* error is captured in context state */
     });
@@ -341,7 +330,7 @@ export function LoginForm() {
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <MonitorDot size={11} />
               <span className="font-mono">
-                {deviceId ? deviceId.slice(0, 8) + "…" : t.stationUnknown}
+                {binding?.counterCode ?? t.stationUnknown}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">

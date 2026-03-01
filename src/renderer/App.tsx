@@ -1,77 +1,117 @@
 /**
  * Root application component.
  *
- * Auth routing:
- *   isBootstrapping  → full-screen loading indicator
- *   !isAuthenticated → LoginForm
- *   mustChangePassword === true → ForcePasswordChange
- *   otherwise → Queue dashboard (placeholder until Phase 6.3)
+ * Boot sequence:
+ *   1. StationProvider resolves Device ID → CounterStation (public API call,
+ *      no auth required). Loading screen is shown until resolution completes.
+ *   2. AuthBridge mounts AuthProvider only after the station status is known,
+ *      ensuring the stationId is available for the silent-refresh bootstrap so
+ *      the new JWT correctly embeds the station claim.
+ *   3. TellerApp routes based on combined auth + station state:
+ *        Station unregistered/error → DeviceNotConfigured screen
+ *        Auth bootstrapping         → loading indicator
+ *        Not authenticated          → LoginForm (stationId pre-wired)
+ *        mustChangePassword         → ForcePasswordChange
+ *        Authenticated              → Queue dashboard (Phase 6.3 placeholder)
  */
 
 import { AuthProvider } from "./providers/AuthContext";
+import { StationProvider, useStation } from "./providers/StationContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
 import { ForcePasswordChange } from "./components/ForcePasswordChange";
+import { DeviceNotConfigured } from "./components/DeviceNotConfigured";
+// Note: DeviceNotConfigured is rendered in AuthBridge (outside AuthProvider) so
+// unregistered/error devices never trigger a silent-refresh bootstrap.
+import { StationInfo } from "./components/StationInfo";
 import { Spinner } from "./components/ui/spinner";
 import { MonitorDot } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/*  Inner app — must be a child of AuthProvider                              */
+/*  Shared full-screen loader                                                 */
 /* -------------------------------------------------------------------------- */
 
-function TellerApp() {
-  const { isBootstrapping, isAuthenticated, user } = useAuth();
-
-  /* ---- Full-screen bootstrap loader ------------------------------------ */
-  if (isBootstrapping) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background text-foreground">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30">
-          <MonitorDot size={20} className="text-primary" />
-        </div>
-        <Spinner size={20} className="text-primary" />
-        <p className="text-xs text-muted-foreground">Initialising session…</p>
-      </div>
-    );
-  }
-
-  /* ---- Not signed in --------------------------------------------------- */
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
-
-  /* ---- Must change password -------------------------------------------- */
-  if (user?.mustChangePassword) {
-    return <ForcePasswordChange />;
-  }
-
-  /* ---- Authenticated — queue dashboard (Phase 6.3 placeholder) --------- */
+function FullScreenLoader() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
+    <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background text-foreground">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30">
         <MonitorDot size={20} className="text-primary" />
       </div>
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-foreground">
-          Welcome, {user?.email}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Queue dashboard — coming in Phase 6.3
-        </p>
-      </div>
-      <p className="text-xs text-muted-foreground">Role: {user?.role}</p>
+      <Spinner size={20} className="text-primary" />
+      <p className="text-xs text-muted-foreground">Initialising…</p>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Exported root — wraps with providers                                     */
+/*  TellerApp — rendered only after station + auth states are both resolved  */
+/* -------------------------------------------------------------------------- */
+
+function TellerApp() {
+  const { isBootstrapping, isAuthenticated, user } = useAuth();
+
+  /* Auth bootstrap still in flight */
+  if (isBootstrapping) return <FullScreenLoader />;
+
+  /* Not signed in */
+  if (!isAuthenticated) return <LoginForm />;
+
+  /* Must change password before proceeding */
+  if (user?.mustChangePassword) return <ForcePasswordChange />;
+
+  /* ---- Authenticated — queue dashboard (Phase 6.3 placeholder) --------- */
+  return (
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <StationInfo tellerName={user?.email} />
+      <main className="flex flex-1 items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm font-medium text-foreground">
+            Queue dashboard
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Coming in Phase 6.3
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  AuthBridge — gates AuthProvider mount until station status is final      */
+/* -------------------------------------------------------------------------- */
+
+function AuthBridge() {
+  const { status, binding } = useStation();
+
+  /* Still resolving — wait before mounting AuthProvider to ensure stationId
+     is available for the silent-refresh bootstrap JWT claim. */
+  if (status === "idle" || status === "resolving") {
+    return <FullScreenLoader />;
+  }
+
+  /* Device not configured — render outside AuthProvider; no auth needed and
+     no point touching secure storage for an unregistered/error device. */
+  if (status === "unregistered" || status === "error") {
+    return <DeviceNotConfigured />;
+  }
+
+  /* status === "bound" and binding is non-null — safe to mount AuthProvider */
+  return (
+    <AuthProvider stationId={binding!.stationId}>
+      <TellerApp />
+    </AuthProvider>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Exported root                                                             */
 /* -------------------------------------------------------------------------- */
 
 export function App() {
   return (
-    <AuthProvider>
-      <TellerApp />
-    </AuthProvider>
+    <StationProvider>
+      <AuthBridge />
+    </StationProvider>
   );
 }
