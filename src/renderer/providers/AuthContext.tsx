@@ -70,7 +70,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 /*  Provider                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  stationId,
+}: {
+  children: React.ReactNode;
+  /** Resolved station ID from StationContext — embedded in JWT on token refresh. */
+  stationId?: string;
+}) {
   const [state, setState] = useState<AuthState>({
     user: null,
     accessToken: null,
@@ -84,6 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ---- Refs — stable across renders ------------------------------------ */
   const accessTokenRef = useRef<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Mirrors the `stationId` prop. Using a ref means silentRefreshFromStorage
+   * always reads the latest value without needing to be in the dependency array.
+   */
+  const stationIdRef = useRef<string | undefined>(stationId);
+
+  /* Keep stationIdRef current when the prop changes (station binding resolves). */
+  useEffect(() => {
+    stationIdRef.current = stationId;
+  }, [stationId]);
 
   /* ---- Auth provider & API base URL ------------------------------------ */
   const apiBaseUrl =
@@ -181,7 +198,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw { code: "FORBIDDEN", message: "No stored refresh token" };
     }
 
-    const result = await authProvider.refresh({ refreshToken: storedRefreshToken });
+    const result = await authProvider.refresh({
+      refreshToken: storedRefreshToken,
+      // Re-bind the stationId so the new JWT retains the station claim.
+      stationId: stationIdRef.current,
+    });
     applyAuthResult(
       result.user,
       result.auth.accessToken,
