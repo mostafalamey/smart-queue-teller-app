@@ -5,6 +5,7 @@ const Label = React.forwardRef<
   HTMLLabelElement,
   React.LabelHTMLAttributes<HTMLLabelElement>
 >(({ className, ...props }, ref) => (
+   // biome-ignore lint/a11y/noLabelWithoutControl: association is provided by consumers via htmlFor or nesting.
   <label
     ref={ref}
     className={cn(

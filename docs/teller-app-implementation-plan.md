@@ -239,6 +239,21 @@ smart-queue-teller-app/
 - App restart with stored refresh token auto-logs in.
 - Logout clears all state and returns to login screen.
 
+#### Post-Review Hardening (2026-03-01)
+
+Fixes applied after PR review before merge:
+
+- [x] **`API_BASE_URL` required in production** (`main.ts`): production startup exits with a user-visible dialog instead of silently falling back to `localhost` in the CSP.
+- [x] **CSP enforced for `file://` loads** (`main.ts`): replaced `session.webRequest.onHeadersReceived` (skipped for `file://`) with `protocol.handle('file', …)` so the CSP is injected on HTML responses for packaged builds; dev still uses `onHeadersReceived` for the Vite HTTP server.
+- [x] **Dev CSP includes `'unsafe-inline'`** (`main.ts`): required for `@vitejs/plugin-react` Fast Refresh preamble; production CSP remains strict.
+- [x] **`asChild` removed from `ButtonProps`** (`components/ui/button.tsx`): was declared but never implemented — would have leaked onto DOM `<button>` attributes.
+- [x] **`toApiErrorCode()` type guard in `auth-provider.ts`**: validates `body.code` against the full `ApiErrorCode` union before throwing; unrecognised codes fall back to `"UNKNOWN"` instead of passing through an unsafe cast.
+- [x] **`toApiErrorCode()` type guard in `api-client.ts`**: same pattern applied to `parseErrorResponse()` to replace the unsafe `as ApiErrorCode` assertion.
+- [x] **Proactive refresh timer error handler** (`providers/AuthContext.tsx`): `.catch()` added to the timer callback — on failure it logs, clears the timer, wipes the stale stored token, and resets state to unauthenticated.
+- [x] **Bootstrap silent-refresh failure handling** (`providers/AuthContext.tsx`): catch block now clears the timer, nulls the access token ref, deletes the stale stored key, and logs the error instead of swallowing it.
+- [x] **Full optional chaining on `secureStorage` calls** (`providers/AuthContext.tsx`): all six `window.tellerRuntime?.secureStorage.method()` call-sites updated to `?.secureStorage?.method()` so the app doesn't throw when running in `dev:web` (no Electron runtime).
+- [x] **`SESSION_EXPIRED` error code introduced** (`data/types.ts`, `data/auth-provider.ts`, `providers/AuthContext.tsx`, `components/LoginForm.tsx`): replaces `FORBIDDEN` for forced-logout/session-expiry paths so `resolveErrorMessage()` shows the correct "session expired" banner instead of the "no teller access" message.
+
 ---
 
 ### Phase 6.2 — Station Binding & Session Bootstrap

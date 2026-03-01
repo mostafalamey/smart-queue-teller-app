@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -250,28 +250,104 @@ app.whenReady().then(() => {
   /* ---- Content-Security-Policy ----------------------------------------- */
   /* Suppress the Electron "Insecure CSP" dev warning and harden the renderer */
   const isDev = !app.isPackaged;
-  const connectSrcHosts = isDev
-    ? "http://localhost:* ws://localhost:*"
-    : (process.env.API_BASE_URL ?? "http://localhost:3000");
+
+  let connectSrcHosts: string;
+  if (isDev) {
+    connectSrcHosts = "http://localhost:* ws://localhost:*";
+  } else {
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiBaseUrl) {
+      dialog.showErrorBox(
+        "Configuration Error",
+        "API_BASE_URL environment variable must be set in production.\nThe application cannot start without it."
+      );
+      app.exit(1);
+      // Unreachable — app.exit() terminates the process synchronously via the event loop,
+      // but TypeScript doesn't know that, so throw to satisfy the definite-assignment check.
+      throw new Error("API_BASE_URL is required in production");
+    }
+    connectSrcHosts = apiBaseUrl;
+  }
 
   const csp = [
     "default-src 'none'",
-    // allow Vite HMR eval in dev; strict in production
-    isDev ? "script-src 'self' 'unsafe-eval'" : "script-src 'self'",
+    // 'unsafe-eval' is required for Vite HMR; 'unsafe-inline' is required for the
+    // @vitejs/plugin-react Fast Refresh preamble inline script. Both are dev-only.
+    isDev ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'" : "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
     `connect-src 'self' ${connectSrcHosts}`,
     "font-src 'self' data:",
   ].join("; ");
 
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+  if (isDev) {
+    // onHeadersReceived fires correctly for HTTP (Vite dev server) — keep it for dev.
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      
+    const cleanResponseHeaders = Object.fromEntries(
+      Object.entries(details.responseHeaders ?? {}).filter(
+        ([headerName]) => headerName.toLowerCase() !== "content-security-policy",
+      ),
+    );
+
     callback({
       responseHeaders: {
-        ...details.responseHeaders,
-        "Content-Security-Policy": [csp],
-      },
+        ...cleanResponseHeaders,
+          "Content-Security-Policy": [csp],
+        },
+      });
     });
-  });
+  } else {
+    // In production the renderer loads via file:// and webRequest.onHeadersReceived
+    // does NOT fire for file:// navigations, so the CSP would be silently bypassed.
+    // Intercept the file: scheme at the protocol level instead.
+    const MIME: Record<string, string> = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "application/javascript",
+      ".mjs": "application/javascript",
+      ".css": "text/css",
+      ".json": "application/json",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".svg": "image/svg+xml",
+      ".ico": "image/x-icon",
+      ".woff": "font/woff",
+      ".woff2": "font/woff2",
+      ".ttf": "font/ttf",
+    };
+
+    protocol.handle("file", async (request) => {
+      let filePath: string;
+      try {
+        filePath = fileURLToPath(request.url);
+      } catch {
+        return new Response("Bad Request", { status: 400 });
+      }
+
+      let data: Buffer;
+      try {
+        data = await fs.promises.readFile(filePath);
+      } catch (err: unknown) {
+        const code = (err as NodeJS.ErrnoException).code;
+        return new Response("Not Found", { status: code === "ENOENT" ? 404 : 500 });
+      }
+
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME[ext] ?? "application/octet-stream";
+      const headers: Record<string, string> = { "Content-Type": contentType };
+
+      // Inject CSP only on HTML responses — the entry-point that bootstraps the renderer.
+      if (ext === ".html") {
+        headers["Content-Security-Policy"] = csp;
+      }
+
+      // Response's BodyInit doesn't include Node's Buffer type directly;
+      // Uint8Array (which Buffer extends) is accepted.
+      return new Response(new Uint8Array(data), { headers });
+    });
+  }
 
   createWindow();
 

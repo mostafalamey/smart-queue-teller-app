@@ -13,11 +13,37 @@
  */
 
 import type {
+  ApiErrorCode,
   ChangePasswordInput,
   LoginInput,
   LoginResult,
   RefreshInput,
 } from "./types";
+
+const API_ERROR_CODES = new Set<ApiErrorCode>([
+  "INVALID_REQUEST",
+  "INVALID_CREDENTIALS",
+  "FORBIDDEN",
+  "SESSION_EXPIRED",
+  "ACCOUNT_LOCKED",
+  "ROLE_SELECTION_REQUIRED",
+  "QUEUE_EMPTY",
+  "INVALID_STATUS_TRANSITION",
+  "TICKET_NOT_FOUND",
+  "STATION_NOT_FOUND",
+  "DEVICE_NOT_CONFIGURED",
+  "ACTIVE_TICKET_EXISTS",
+  "NETWORK_ERROR",
+  "TIMEOUT",
+  "UNKNOWN",
+]);
+
+function toApiErrorCode(value: unknown): ApiErrorCode {
+  if (typeof value === "string" && API_ERROR_CODES.has(value as ApiErrorCode)) {
+    return value as ApiErrorCode;
+  }
+  return "UNKNOWN";
+}
 import { DEFAULT_REQUEST_TIMEOUT_MS } from "../lib/constants";
 
 /* -------------------------------------------------------------------------- */
@@ -81,7 +107,7 @@ async function authRequest<T>(
       /* ignore */
     }
     throw {
-      code: body.code ?? "UNKNOWN",
+      code: toApiErrorCode(body.code),
       message: body.message ?? `Request failed with status ${res.status}`,
       status: res.status,
       lockedUntilSeconds: body.lockedUntilSeconds,

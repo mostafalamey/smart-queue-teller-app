@@ -116,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Persist refresh token via Electron safeStorage
       window.tellerRuntime?.secureStorage
-        .set(SECURE_STORAGE_REFRESH_TOKEN_KEY, refreshToken)
-        .catch((err: unknown) => {
+        ?.set(SECURE_STORAGE_REFRESH_TOKEN_KEY, refreshToken)
+        ?.catch((err: unknown) => {
           console.error("[auth] Failed to persist refresh token:", err);
         });
 
@@ -139,8 +139,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         expiresInSeconds * ACCESS_TOKEN_REFRESH_THRESHOLD * 1000;
 
       refreshTimerRef.current = setTimeout(() => {
-        // Attempt silent background refresh
-        void silentRefreshFromStorage();
+        silentRefreshFromStorage().catch((err: unknown) => {
+          console.error("[auth] Proactive token refresh failed — signing out:", err);
+          // Stop the timer, wipe in-memory token, clear stale stored token,
+          // and drop back to the login screen.
+          clearRefreshTimer();
+          accessTokenRef.current = null;
+          void window.tellerRuntime?.secureStorage
+            ?.delete(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+            ?.catch(() => undefined);
+          setState({
+            user: null,
+            accessToken: null,
+            accessTokenExpiresInSeconds: null,
+            isAuthenticated: false,
+            isBootstrapping: false,
+            isLoading: false,
+            error: {
+              code: "SESSION_EXPIRED",
+              message: "Your session has expired. Please sign in again.",
+            },
+          });
+        });
       }, refreshDelay);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,8 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const silentRefreshFromStorage = useCallback(async (): Promise<string> => {
     const storedRefreshToken = await window.tellerRuntime?.secureStorage
-      .get(SECURE_STORAGE_REFRESH_TOKEN_KEY)
-      .catch(() => null);
+      ?.get(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+      ?.catch(() => null) ?? null;
 
     if (!storedRefreshToken) {
       throw { code: "FORBIDDEN", message: "No stored refresh token" };
@@ -182,9 +202,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       try {
         await silentRefreshFromStorage();
-      } catch {
-        // No stored token or refresh failed — user must log in manually
+      } catch (err) {
+        // No stored token or refresh failed — user must log in manually.
+        // Clear the stale token so we don't attempt it again on next launch.
+        console.error("[auth] Bootstrap refresh failed:", err);
         if (!cancelled) {
+          clearRefreshTimer();
+          accessTokenRef.current = null;
+          void window.tellerRuntime?.secureStorage
+            ?.delete(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+            ?.catch(() => undefined);
           setState((prev) => ({
             ...prev,
             isBootstrapping: false,
@@ -259,8 +286,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const currentAccessToken = accessTokenRef.current;
       const storedRefreshToken = await window.tellerRuntime?.secureStorage
-        .get(SECURE_STORAGE_REFRESH_TOKEN_KEY)
-        .catch(() => null);
+        ?.get(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+        ?.catch(() => null) ?? null;
 
       // Clear memory immediately (don't wait for server response)
       accessTokenRef.current = null;
@@ -273,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         error: forced
           ? {
-              code: "FORBIDDEN",
+              code: "SESSION_EXPIRED",
               message: "Your session has expired. Please sign in again.",
             }
           : null,
@@ -281,8 +308,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Clear secure storage
       await window.tellerRuntime?.secureStorage
-        .delete(SECURE_STORAGE_REFRESH_TOKEN_KEY)
-        .catch(() => undefined);
+        ?.delete(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+        ?.catch(() => undefined);
 
       // Fire-and-forget server-side revocation
       if (storedRefreshToken && currentAccessToken) {

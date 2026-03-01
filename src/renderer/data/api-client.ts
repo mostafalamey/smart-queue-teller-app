@@ -15,6 +15,35 @@ import type { ApiError, ApiErrorCode } from "./types";
 import { DEFAULT_REQUEST_TIMEOUT_MS } from "../lib/constants";
 
 /* -------------------------------------------------------------------------- */
+/*  ApiErrorCode validator                                                    */
+/* -------------------------------------------------------------------------- */
+
+const KNOWN_API_ERROR_CODES = new Set<ApiErrorCode>([
+  "INVALID_REQUEST",
+  "INVALID_CREDENTIALS",
+  "FORBIDDEN",
+  "SESSION_EXPIRED",
+  "ACCOUNT_LOCKED",
+  "ROLE_SELECTION_REQUIRED",
+  "QUEUE_EMPTY",
+  "INVALID_STATUS_TRANSITION",
+  "TICKET_NOT_FOUND",
+  "STATION_NOT_FOUND",
+  "DEVICE_NOT_CONFIGURED",
+  "ACTIVE_TICKET_EXISTS",
+  "NETWORK_ERROR",
+  "TIMEOUT",
+  "UNKNOWN",
+]);
+
+function toApiErrorCode(value: unknown): ApiErrorCode {
+  if (typeof value === "string" && KNOWN_API_ERROR_CODES.has(value as ApiErrorCode)) {
+    return value as ApiErrorCode;
+  }
+  return "UNKNOWN";
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -68,7 +97,7 @@ async function parseErrorResponse(res: Response): Promise<ApiError> {
     /* JSON parse failure — use generic message */
   }
 
-  const code = (body.code ?? "UNKNOWN") as ApiErrorCode;
+  const code = toApiErrorCode(body.code);
   const message =
     body.message ?? `Request failed with status ${res.status}`;
 
@@ -150,7 +179,7 @@ export class ApiClient {
       ...options.headers,
     };
 
-    if (!skipAuth) {
+    if (!skipAuth && !headers["Authorization"]) {
       const token = this.getAccessToken();
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -187,6 +216,7 @@ export class ApiClient {
         // Retry original request with the new token
         return this.request<T>(method, path, body, {
           ...options,
+          skipAuth: true, // prevent infinite loop if the new token also fails
           headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
           _isRetry: true,
         });

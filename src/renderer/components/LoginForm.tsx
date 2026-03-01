@@ -40,6 +40,7 @@ const strings = {
     timeoutError: "Request timed out. The server may be unavailable.",
     invalidCredentials: "Invalid email or password.",
     forbidden: "Your account does not have teller access.",
+    sessionExpired: "Your session has expired. Please sign in again.",
     lockedPrefix: "Account locked.",
     lockedSuffix: " Try again in",
     lockedMinutes: (s: number) => {
@@ -67,6 +68,7 @@ const strings = {
     timeoutError: "انتهت مهلة الطلب. قد يكون الخادم غير متاح.",
     invalidCredentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
     forbidden: "لا يملك حسابك صلاحية الوصول إلى هذا التطبيق.",
+    sessionExpired: "انتهت صلاحية جلستك. يرجى تسجيل الدخول مجدداً.",
     lockedPrefix: "الحساب مقفل.",
     lockedSuffix: " يمكنك إعادة المحاولة بعد",
     lockedMinutes: (s: number) => {
@@ -98,6 +100,8 @@ function resolveErrorMessage(
       return t.invalidCredentials;
     case "FORBIDDEN":
       return t.forbidden;
+    case "SESSION_EXPIRED":
+      return t.sessionExpired;
     case "ACCOUNT_LOCKED": {
       const secs = err.lockedUntilSeconds ?? 0;
       return `${t.lockedPrefix}${t.lockedSuffix}${t.lockedMinutes(secs)}.`;
@@ -282,8 +286,8 @@ export function LoginForm() {
                       "absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none",
                       isRtl ? "left-2.5" : "right-2.5",
                     )}
-                    tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>

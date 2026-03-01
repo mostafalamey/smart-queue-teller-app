@@ -133,7 +133,6 @@ export function ForcePasswordChange() {
                     type="button"
                     onClick={() => setShowCurrent((v) => !v)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
-                    tabIndex={-1}
                     aria-label={showCurrent ? "Hide" : "Show"}
                   >
                     {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -162,8 +161,8 @@ export function ForcePasswordChange() {
                     type="button"
                     onClick={() => setShowNew((v) => !v)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
-                    tabIndex={-1}
                     aria-label={showNew ? "Hide" : "Show"}
+                    aria-pressed={showNew}
                   >
                     {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
