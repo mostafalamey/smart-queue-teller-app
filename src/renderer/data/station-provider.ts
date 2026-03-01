@@ -48,11 +48,12 @@ export async function resolveStationBinding(
   baseUrl: string,
   timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<StationBinding> {
+  const base = baseUrl.replace(/\/$/, "");
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const url = `${baseUrl}/teller/station?deviceId=${encodeURIComponent(deviceId)}`;
+    const url = `${base}/teller/station?deviceId=${encodeURIComponent(deviceId)}`;
 
     let res: Response;
     try {

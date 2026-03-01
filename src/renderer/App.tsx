@@ -21,6 +21,8 @@ import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
 import { ForcePasswordChange } from "./components/ForcePasswordChange";
 import { DeviceNotConfigured } from "./components/DeviceNotConfigured";
+// Note: DeviceNotConfigured is rendered in AuthBridge (outside AuthProvider) so
+// unregistered/error devices never trigger a silent-refresh bootstrap.
 import { StationInfo } from "./components/StationInfo";
 import { Spinner } from "./components/ui/spinner";
 import { MonitorDot } from "lucide-react";
@@ -47,15 +49,9 @@ function FullScreenLoader() {
 
 function TellerApp() {
   const { isBootstrapping, isAuthenticated, user } = useAuth();
-  const { status } = useStation();
 
   /* Auth bootstrap still in flight */
   if (isBootstrapping) return <FullScreenLoader />;
-
-  /* Device not registered or network error during station resolution */
-  if (status === "unregistered" || status === "error") {
-    return <DeviceNotConfigured />;
-  }
 
   /* Not signed in */
   if (!isAuthenticated) return <LoginForm />;
@@ -88,16 +84,21 @@ function TellerApp() {
 function AuthBridge() {
   const { status, binding } = useStation();
 
-  /* Wait for station resolution to finish before mounting AuthProvider.
-     This prevents a race where the silent-refresh bootstrap fires before
-     binding?.stationId is available, which would produce a JWT without the
-     station claim and break all subsequent teller actions. */
+  /* Still resolving — wait before mounting AuthProvider to ensure stationId
+     is available for the silent-refresh bootstrap JWT claim. */
   if (status === "idle" || status === "resolving") {
     return <FullScreenLoader />;
   }
 
+  /* Device not configured — render outside AuthProvider; no auth needed and
+     no point touching secure storage for an unregistered/error device. */
+  if (status === "unregistered" || status === "error") {
+    return <DeviceNotConfigured />;
+  }
+
+  /* status === "bound" and binding is non-null — safe to mount AuthProvider */
   return (
-    <AuthProvider stationId={binding?.stationId}>
+    <AuthProvider stationId={binding!.stationId}>
       <TellerApp />
     </AuthProvider>
   );

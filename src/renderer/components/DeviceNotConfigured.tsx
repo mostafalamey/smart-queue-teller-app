@@ -9,7 +9,7 @@
  * Design mirrors the LoginForm dark-card aesthetic.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   Copy,
@@ -77,18 +77,31 @@ export function DeviceNotConfigured() {
   const { status, deviceId, error, retry } = useStation();
   const [lang, setLang] = useState<Lang>("en");
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Clear any pending "reset copied state" timer on unmount */
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const t = strings[lang];
   const isRtl = lang === "ar";
   const isError = status === "error";
   const isResolving = status === "resolving";
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!deviceId) return;
-    void navigator.clipboard.writeText(deviceId).then(() => {
+    try {
+      await navigator.clipboard.writeText(deviceId);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* Clipboard unavailable (permissions denied / insecure context) —
+         fail silently; the Device ID is still visible on screen. */
+    }
   };
 
   const title = isError ? t.titleError : t.titleUnregistered;
@@ -153,7 +166,7 @@ export function DeviceNotConfigured() {
             </code>
             <button
               type="button"
-              onClick={handleCopy}
+              onClick={() => { void handleCopy(); }}
               disabled={!deviceId}
               className={cn(
                 "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border transition-colors",
