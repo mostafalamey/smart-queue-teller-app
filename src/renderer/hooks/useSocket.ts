@@ -91,13 +91,17 @@ export function useSocket({
       return;
     }
 
-    setConnectionState("connecting");
-
     const token = getAccessToken();
+    // autoConnect:false prevents the socket from dialling immediately on
+    // construction. We defer the actual connect() call by one tick so that
+    // React StrictMode's mount→unmount→remount cycle can cancel the timer
+    // before the socket ever attempts to open a WebSocket, eliminating the
+    // "WebSocket is closed before the connection was established" dev warning.
     const socket = io(apiBaseUrl, {
       path: "/realtime/socket.io",
       transports: ["websocket", "polling"],
       auth: { token },
+      autoConnect: false,
       // socket.io-client handles exponential back-off reconnection internally.
       reconnection: true,
       reconnectionDelay: 1_000,
@@ -107,6 +111,11 @@ export function useSocket({
     });
 
     socketRef.current = socket;
+    setConnectionState("connecting");
+
+    const connectTimer = setTimeout(() => {
+      socket.connect();
+    }, 0);
 
     socket.on("connect", () => {
       setConnectionState("connected");
@@ -142,6 +151,7 @@ export function useSocket({
     );
 
     return () => {
+      clearTimeout(connectTimer);
       socket.off();
       socket.io.off("reconnect_attempt");
       socket.io.off("reconnect");
