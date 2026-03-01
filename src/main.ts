@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -246,6 +246,33 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   registerIpcHandlers();
+
+  /* ---- Content-Security-Policy ----------------------------------------- */
+  /* Suppress the Electron "Insecure CSP" dev warning and harden the renderer */
+  const isDev = !app.isPackaged;
+  const connectSrcHosts = isDev
+    ? "http://localhost:* ws://localhost:*"
+    : (process.env.API_BASE_URL ?? "http://localhost:3000");
+
+  const csp = [
+    "default-src 'none'",
+    // allow Vite HMR eval in dev; strict in production
+    isDev ? "script-src 'self' 'unsafe-eval'" : "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    `connect-src 'self' ${connectSrcHosts}`,
+    "font-src 'self' data:",
+  ].join("; ");
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [csp],
+      },
+    });
+  });
+
   createWindow();
 
   app.on("activate", () => {
