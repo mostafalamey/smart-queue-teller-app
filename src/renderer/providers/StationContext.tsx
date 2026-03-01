@@ -31,6 +31,19 @@ import {
 import type { ApiError, StationBinding } from "../data/types";
 
 /* -------------------------------------------------------------------------- */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function isApiError(err: unknown): err is ApiError {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    typeof (err as Record<string, unknown>)["code"] === "string" &&
+    typeof (err as Record<string, unknown>)["message"] === "string"
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -129,7 +142,15 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
       setState({ binding, deviceId, deviceIdPersisted, status: "bound", error: null });
     } catch (err) {
       if (attemptRef.current !== attemptId) return;
-      const apiError = err as ApiError;
+      const apiError: ApiError = isApiError(err)
+        ? err
+        : {
+            code: "UNKNOWN",
+            message:
+              err instanceof Error
+                ? err.message
+                : "An unexpected error occurred during station resolution.",
+          };
       setState({
         binding: null,
         deviceId,
