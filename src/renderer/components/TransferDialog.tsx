@@ -28,7 +28,6 @@ import type { Department, QueueTicket, Service, TransferReason } from "../data/t
 import type { TellerProvider } from "../data/teller-provider";
 import {
   X,
-  ChevronRight,
   ChevronLeft,
   ArrowRightLeft,
   AlertCircle,
@@ -236,8 +235,10 @@ export function TransferDialog({
       try {
         const svcList = await provider.getServices(deptId);
         if (!mountedRef.current) return;
-        // Exclude the ticket's current service from destinations
-        setServices(svcList.filter((s) => s.id !== currentServiceId && s.isActive));
+        // Exclude the ticket's current service from destinations.
+        // Do NOT filter by isActive here — the backend controls service availability;
+        // silently hiding services causes the empty-list bug when isActive is unset.
+        setServices(svcList.filter((s) => s.id !== currentServiceId));
       } catch {
         if (!mountedRef.current) return;
         setFetchError("Failed to load services for this department.");
@@ -250,28 +251,25 @@ export function TransferDialog({
 
   /* ---- Navigation ------------------------------------------------------- */
 
+  // Selecting a department immediately fetches services and advances to step 2.
   const handleSelectDept = (dept: Department) => {
     setSelectedDept(dept);
-    setSelectedService(null); // reset downstream selections
+    setSelectedService(null);
+    setSelectedReason(null);
+    void fetchServices(dept.id);
+    setStep(2);
+    listRef.current?.scrollTo(0, 0);
   };
 
+  // Selecting a service immediately advances to step 3.
   const handleSelectService = (svc: Service) => {
     setSelectedService(svc);
+    setStep(3);
+    listRef.current?.scrollTo(0, 0);
   };
 
   const handleSelectReason = (reason: TransferReason) => {
     setSelectedReason(reason);
-  };
-
-  const handleNext = () => {
-    if (step === 1 && selectedDept) {
-      void fetchServices(selectedDept.id);
-      setStep(2);
-      listRef.current?.scrollTo(0, 0);
-    } else if (step === 2 && selectedService) {
-      setStep(3);
-      listRef.current?.scrollTo(0, 0);
-    }
   };
 
   const handleBack = () => {
@@ -302,11 +300,8 @@ export function TransferDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isConfirming, onClose]);
 
-  /* ---- Derived can-advance flag ---------------------------------------- */
-  const canAdvance =
-    (step === 1 && !!selectedDept) ||
-    (step === 2 && !!selectedService) ||
-    (step === 3 && !!selectedReason);
+  /* ---- Confirm is only enabled once a reason is selected --------------- */
+  const canConfirm = !!selectedDept && !!selectedService && !!selectedReason;
 
   /* ---- Step headings ---------------------------------------------------- */
   const STEP_HEADING: Record<Step, string> = {
@@ -445,7 +440,7 @@ export function TransferDialog({
 
         {/* ── Footer ── */}
         <div className="flex items-center justify-between border-t border-border/50 px-5 py-3">
-          {/* Left: Cancel (step 1) or Back (steps 2–3) */}
+            {/* Left: Cancel (step 1) or Back (steps 2–3) */}
           {step === 1 ? (
             <Button
               variant="ghost"
@@ -469,21 +464,11 @@ export function TransferDialog({
             </Button>
           )}
 
-          {/* Right: Next (steps 1–2) or Confirm (step 3) */}
-          {step < 3 ? (
+          {/* Right: Confirm (step 3 only) */}
+          {step === 3 && (
             <Button
               size="sm"
-              disabled={!canAdvance || isConfirming}
-              onClick={handleNext}
-              className="min-w-[96px]"
-            >
-              Next
-              <ChevronRight size={14} />
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              disabled={!canAdvance || isConfirming}
+              disabled={!canConfirm || isConfirming}
               onClick={handleConfirm}
               className="min-w-[120px] bg-blue-600 text-white hover:bg-blue-600/90"
             >
