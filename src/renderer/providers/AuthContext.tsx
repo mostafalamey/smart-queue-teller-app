@@ -339,6 +339,12 @@ export function AuthProvider({
 
   const performLogout = useCallback(
     async (forced = false): Promise<void> => {
+      // Show loading state for user-initiated logouts so the button disables
+      // and the spinner renders while the IPC/server call is in flight.
+      if (!forced) {
+        setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      }
+
       clearRefreshTimer();
 
       const currentAccessToken = accessTokenRef.current;

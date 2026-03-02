@@ -16,13 +16,14 @@ import { cn } from "../lib/utils";
 /*  Timestamp helper                                                          */
 /* -------------------------------------------------------------------------- */
 
-function formatRelativeTime(date: Date, justNowLabel: string): string {
+function formatRelativeTime(date: Date, justNowLabel: string, locale: string): string {
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
   if (diffSec <= 0) return justNowLabel;
-  if (diffSec < 60) return `${diffSec}s`;
+  const rtf = new Intl.RelativeTimeFormat(locale, { style: "short", numeric: "always" });
+  if (diffSec < 60) return rtf.format(-diffSec, "second");
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m`;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffMin < 60) return rtf.format(-diffMin, "minute");
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -79,7 +80,7 @@ export function OfflineBanner({ lastRefreshedAt }: OfflineBannerProps) {
           title={t.lastUpdated}
         >
           <Clock size={10} aria-hidden="true" />
-          {formatRelativeTime(lastRefreshedAt, t.justNow)}
+          {formatRelativeTime(lastRefreshedAt, t.justNow, lang)}
         </span>
       )}
     </div>

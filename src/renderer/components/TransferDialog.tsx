@@ -186,6 +186,14 @@ export function TransferDialog({
 }: TransferDialogProps) {
   const { lang } = useLanguage();
   const t = dashboardStrings[lang];
+
+  /** Returns the display name in the active locale, falling back to the other. */
+  const locName = (entity: { nameEn: string; nameAr: string }) =>
+    lang === "ar" ? (entity.nameAr || entity.nameEn) : (entity.nameEn || entity.nameAr);
+  /** Returns the secondary (opposite) language name for the bilingual hint. */
+  const altName = (entity: { nameEn: string; nameAr: string }) =>
+    lang === "ar" ? entity.nameEn : entity.nameAr;
+
   const [step, setStep] = useState<Step>(1);
 
   /* ---- Selections -------------------------------------------------------- */
@@ -306,20 +314,24 @@ export function TransferDialog({
 
   /* ---- Focus trap -------------------------------------------------------- */
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  const FOCUSABLE =
+    "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
+
+  // Focus the first element once on dialog mount only.
+  useEffect(() => {
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-register the Tab-wrap handler whenever the step's focusable set changes.
   useEffect(() => {
     const el = dialogRef.current;
     if (!el) return;
-    // Move focus into the dialog on mount.
-    const firstFocusable = el.querySelector<HTMLElement>(
-      "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])",
-    );
-    firstFocusable?.focus();
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
-      const focusable = el.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])",
-      );
+      const focusable = el.querySelectorAll<HTMLElement>(FOCUSABLE);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -341,7 +353,7 @@ export function TransferDialog({
   /* ---- Step headings ---------------------------------------------------- */
   const STEP_HEADING: Record<Step, string> = {
     1: t.selectDepartment,
-    2: t.servicesIn(selectedDept?.nameEn ?? "—"),
+    2: t.servicesIn(selectedDept ? locName(selectedDept) : "—"),
     3: t.reasonForTransfer,
   };
 
@@ -416,8 +428,8 @@ export function TransferDialog({
                 getId={(d) => d.id}
                 renderItem={(d) => (
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium">{d.nameEn}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{d.nameAr}</span>
+                    <span className="font-medium">{locName(d)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{altName(d)}</span>
                   </div>
                 )}
                 onSelect={handleSelectDept}
@@ -437,9 +449,9 @@ export function TransferDialog({
                       <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
                         {s.ticketPrefix}
                       </span>
-                      <span className="font-medium">{s.nameEn}</span>
+                      <span className="font-medium">{locName(s)}</span>
                     </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">{s.nameAr}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{altName(s)}</span>
                   </div>
                 )}
                 onSelect={handleSelectService}
@@ -454,9 +466,9 @@ export function TransferDialog({
                 <div className="mb-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
                   <p className="text-[11px] text-muted-foreground">{t.transferringTo}</p>
                   <p className="mt-0.5 text-sm font-semibold text-foreground">
-                    {selectedService?.nameEn}
+                    {selectedService ? locName(selectedService) : "—"}
                     <span className="ml-1.5 font-normal text-muted-foreground">
-                      — {selectedDept?.nameEn}
+                      — {selectedDept ? locName(selectedDept) : "—"}
                     </span>
                   </p>
                 </div>
@@ -467,8 +479,8 @@ export function TransferDialog({
                   getId={(r) => r.id}
                   renderItem={(r) => (
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium">{r.nameEn}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{r.nameAr}</span>
+                      <span className="font-medium">{locName(r)}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{altName(r)}</span>
                     </div>
                   )}
                   onSelect={handleSelectReason}

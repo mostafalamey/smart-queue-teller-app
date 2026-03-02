@@ -17,7 +17,7 @@
 
 /* Smooth direction transition for RTL ↔ LTR */
 [dir] {
-  transition: direction 0s;
+  transition: direction 3s;
 }
 
 /* Fade-in animation for view transitions */

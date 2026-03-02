@@ -28,6 +28,7 @@ const strings = {
     emergency: "Emergency",
     vip: "VIP",
     normal: "Normal",
+    priorityPhrase: (level: string) => `${level} priority`,
 
     /* ── Waiting list ─── */
     waitingHeader: "Waiting",
@@ -51,7 +52,10 @@ const strings = {
     errStationNotFound: "Station binding error — contact IT",
     errForbidden: "Service mismatch or insufficient permissions for this station",
     errActiveTicketExists: "You already have an active ticket at this station",
+    errInvalidTransferReason: "Invalid transfer reason — please select a valid option",
     errActionFailed: "Action failed",
+    errLoadFailed: "Failed to load queue data",
+    retry: "Retry",
 
     /* ── Offline banner ─── */
     connectionLost: "Connection lost — actions disabled",
@@ -128,6 +132,7 @@ const strings = {
     emergency: "طوارئ",
     vip: "VIP",
     normal: "عادي",
+    priorityPhrase: (level: string) => `أولوية: ${level}`,
 
     /* ── Waiting list ─── */
     waitingHeader: "قائمة الانتظار",
@@ -151,7 +156,10 @@ const strings = {
     errStationNotFound: "خطأ في ربط المحطة — تواصل مع تقنية المعلومات",
     errForbidden: "عدم تطابق الخدمة أو صلاحيات غير كافية",
     errActiveTicketExists: "لديك تذكرة نشطة بالفعل في هذه المحطة",
+    errInvalidTransferReason: "سبب التحويل غير صالح — اختر خياراً مناسباً",
     errActionFailed: "فشل الإجراء",
+    errLoadFailed: "فشل تحميل بيانات الطابور",
+    retry: "إعادة المحاولة",
 
     /* ── Offline banner ─── */
     connectionLost: "انقطع الاتصال — الإجراءات معطّلة",

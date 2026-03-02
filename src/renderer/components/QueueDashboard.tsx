@@ -29,7 +29,7 @@ import { useLanguage } from "../providers/LanguageContext";
 import dashboardStrings from "../lib/i18n";
 import type { DashboardStrings } from "../lib/i18n";
 import { cn } from "../lib/utils";
-import type { QueueTicket, WaitingTicket } from "../data/types";
+import type { ApiError, QueueTicket, WaitingTicket } from "../data/types";
 import {
   Users,
   CheckCircle2,
@@ -190,11 +190,12 @@ function CurrentTicketCard({ ticket, timer, t, actions }: CurrentTicketCardProps
   }
 
   const priority = getPriority(ticket.priorityWeight);
+  const statusLabel = ticket.status === "CALLED" ? t.statusCalled : t.statusServing;
 
   return (
     <Card
       role="region"
-      aria-label={`${t.statusServing} ${ticket.ticketNumber}`}
+      aria-label={`${statusLabel} ${ticket.ticketNumber}`}
       aria-live="polite"
       className={cn(
         "flex flex-1 flex-col gap-0 overflow-hidden",
@@ -309,7 +310,7 @@ function WaitingList({ tickets, isLoading, t }: WaitingListProps) {
                     )}
                     aria-hidden="true"
                   />
-                   <span className="sr-only">{getPriorityLabel(priority, t)} priority</span>
+                   <span className="sr-only">{t.priorityPhrase(getPriorityLabel(priority, t))}</span>
 
                   {/* Ticket number */}
                   <span className="flex-1 font-mono text-sm font-semibold tabular-nums text-foreground">
@@ -340,9 +341,11 @@ function WaitingList({ tickets, isLoading, t }: WaitingListProps) {
 function ErrorBanner({
   message,
   onRetry,
+  retryLabel,
 }: {
   message: string;
   onRetry: () => void;
+  retryLabel: string;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5 text-sm">
@@ -354,7 +357,7 @@ function ErrorBanner({
         className="flex items-center gap-1 text-xs text-primary hover:underline"
       >
         <RefreshCcw size={11} />
-        Retry
+        {retryLabel}
       </button>
     </div>
   );
@@ -364,18 +367,27 @@ function ErrorBanner({
 /*  Error message resolver                                                    */
 /* -------------------------------------------------------------------------- */
 
-function resolveQueueErrorMessage(error: { code?: string; message?: string }): string {
+function resolveQueueErrorMessage(
+  error: { code?: string; message?: string },
+  t: DashboardStrings,
+): string {
   switch (error.code) {
-    case "QUEUE_EMPTY":
-      return "No patients waiting in queue";
-    case "TICKET_NOT_FOUND":
-      return "Ticket no longer exists. Refreshing queue state may help.";
-    case "INVALID_STATUS_TRANSITION":
-      return "This action is not available for the current ticket status.";
-    case "FORBIDDEN":
-      return "Service mismatch or insufficient permissions for this station.";
-    default:
-      return error.message ?? "Failed to load queue data";
+    case "QUEUE_EMPTY":               return t.errQueueEmpty;
+    case "TICKET_NOT_FOUND":          return t.errTicketNotFound;
+    case "INVALID_STATUS_TRANSITION": return t.errInvalidTransition;
+    case "FORBIDDEN":                 return t.errForbidden;
+    default:                          return t.errLoadFailed;
+  }
+}
+
+function resolveTransferError(error: ApiError, t: DashboardStrings): string {
+  switch (error.code) {
+    case "TICKET_NOT_FOUND":        return t.errTicketNotFound;
+    case "INVALID_STATUS_TRANSITION": return t.errInvalidTransition;
+    case "STATION_NOT_FOUND":       return t.errStationNotFound;
+    case "FORBIDDEN":               return t.errForbidden;
+    case "INVALID_TRANSFER_REASON": return t.errInvalidTransferReason;
+    default:                        return t.errActionFailed;
   }
 }
 
@@ -392,8 +404,8 @@ function SkeletonDashboard() {
     <>
       {/* Metric cards skeleton */}
       <div className="flex gap-3 shrink-0">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="flex flex-1 items-center gap-3 px-4 py-3">
+        {["sk-m1", "sk-m2", "sk-m3", "sk-m4"].map((id) => (
+          <Card key={id} className="flex flex-1 items-center gap-3 px-4 py-3">
             <SkeletonPulse className="h-8 w-8 rounded-lg" />
             <div className="space-y-1.5">
               <SkeletonPulse className="h-2.5 w-12" />
@@ -425,8 +437,8 @@ function SkeletonDashboard() {
             <SkeletonPulse className="h-3 w-16" />
           </div>
           <div className="space-y-0">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+            {["sk-r1", "sk-r2", "sk-r3", "sk-r4", "sk-r5", "sk-r6"].map((id) => (
+              <div key={id} className="flex items-center gap-3 px-4 py-2.5">
                 <SkeletonPulse className="h-3 w-4" />
                 <SkeletonPulse className="h-1.5 w-1.5 rounded-full" />
                 <SkeletonPulse className="h-4 w-16" />
@@ -550,8 +562,9 @@ export function QueueDashboard() {
       {/* Error banner */}
       {error && (
         <ErrorBanner
-          message={resolveQueueErrorMessage(error)}
+          message={resolveQueueErrorMessage(error, t)}
           onRetry={refresh}
+          retryLabel={t.retry}
         />
       )}
 
@@ -570,70 +583,73 @@ export function QueueDashboard() {
         </div>
       )}
 
-      {/* Summary metrics */}
-      <div className="flex gap-3 shrink-0 animate-slide-up">
-        <MetricCard
-          icon={<Users size={15} className="text-primary" />}
-          label={t.waiting}
-          value={summary?.waitingCount ?? 0}
-          accent="bg-primary/10"
-        />
-        <MetricCard
-          icon={<MonitorCheck size={15} className="text-blue-500" />}
-          label={t.serving}
-          value={summary?.servingCount ?? 0}
-          accent="bg-blue-500/10"
-        />
-        <MetricCard
-          icon={<CheckCircle2 size={15} className="text-emerald-500" />}
-          label={t.doneToday}
-          value={summary?.completedToday ?? 0}
-          accent="bg-emerald-500/10"
-        />
-        <MetricCard
-          icon={<XCircle size={15} className="text-amber-500" />}
-          label={t.noShows}
-          value={summary?.noShowsToday ?? 0}
-          accent="bg-amber-500/10"
-        />
-      </div>
-
-      {/* Main area: serving card + waiting list */}
+      {/* Summary metrics + main area — skeleton until first data arrives */}
       {isLoading && !summary ? (
         <SkeletonDashboard />
       ) : (
-        <div className="flex flex-1 gap-3 overflow-hidden">
-          {/* Currently serving + actions — takes ~55% width */}
-          <div className="flex w-[55%] shrink-0 flex-col">
-            <CurrentTicketCard
-              ticket={currentTicket}
-              timer={timer}
-              t={t}
-              actions={
-                <ActionPanel
-                  currentTicket={currentTicket}
-                  serviceId={serviceId}
-                  isActionInFlight={isActionInFlight}
-                  actionError={actionError}
-                  isOffline={isOffline}
-                  t={t}
-                  onCallNext={() => void callNext()}
-                  onStartServing={() => void startServing()}
-                  onRecall={() => void recall()}
-                  onSkipNoShow={() => void skipNoShow()}
-                  onComplete={() => void complete()}
-                  onTransfer={handleOpenTransfer}
-                  skipNoShowTriggerRef={skipNoShowTriggerRef}
-                />
-              }
+        <>
+          {/* Summary metrics */}
+          <div className="flex gap-3 shrink-0 animate-slide-up">
+            <MetricCard
+              icon={<Users size={15} className="text-primary" />}
+              label={t.waiting}
+              value={summary?.waitingCount ?? 0}
+              accent="bg-primary/10"
+            />
+            <MetricCard
+              icon={<MonitorCheck size={15} className="text-blue-500" />}
+              label={t.serving}
+              value={summary?.servingCount ?? 0}
+              accent="bg-blue-500/10"
+            />
+            <MetricCard
+              icon={<CheckCircle2 size={15} className="text-emerald-500" />}
+              label={t.doneToday}
+              value={summary?.completedToday ?? 0}
+              accent="bg-emerald-500/10"
+            />
+            <MetricCard
+              icon={<XCircle size={15} className="text-amber-500" />}
+              label={t.noShows}
+              value={summary?.noShowsToday ?? 0}
+              accent="bg-amber-500/10"
             />
           </div>
 
-          {/* Waiting list — takes remaining width */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <WaitingList tickets={waitingTickets} isLoading={isLoading} t={t} />
+          {/* Main area: serving card + waiting list */}
+          <div className="flex flex-1 gap-3 overflow-hidden">
+            {/* Currently serving + actions — takes ~55% width */}
+            <div className="flex w-[55%] shrink-0 flex-col">
+              <CurrentTicketCard
+                ticket={currentTicket}
+                timer={timer}
+                t={t}
+                actions={
+                  <ActionPanel
+                    currentTicket={currentTicket}
+                    serviceId={serviceId}
+                    isActionInFlight={isActionInFlight}
+                    actionError={actionError}
+                    isOffline={isOffline}
+                    t={t}
+                    onCallNext={() => void callNext()}
+                    onStartServing={() => void startServing()}
+                    onRecall={() => void recall()}
+                    onSkipNoShow={() => void skipNoShow()}
+                    onComplete={() => void complete()}
+                    onTransfer={handleOpenTransfer}
+                    skipNoShowTriggerRef={skipNoShowTriggerRef}
+                  />
+                }
+              />
+            </div>
+
+            {/* Waiting list — takes remaining width */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <WaitingList tickets={waitingTickets} isLoading={isLoading} t={t} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Shortcut reference panel (F12) */}
@@ -648,7 +664,7 @@ export function QueueDashboard() {
           currentServiceId={serviceId}
           provider={provider}
           isConfirming={isTransferInFlight}
-          submitError={transferError?.message ?? null}
+          submitError={transferError ? resolveTransferError(transferError, t) : null}
           onConfirm={(params) => void handleTransferConfirm(params)}
           onClose={() => setIsTransferDialogOpen(false)}
         />
@@ -659,7 +675,7 @@ export function QueueDashboard() {
       {!isTransferDialogOpen && transferError && (
         <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-500">
           <ArrowRightLeft size={14} className="shrink-0" />
-          <span className="flex-1">{transferError.message ?? t.errActionFailed}</span>
+          <span className="flex-1">{resolveTransferError(transferError, t)}</span>
           <button
             type="button"
             onClick={clearTransferError}

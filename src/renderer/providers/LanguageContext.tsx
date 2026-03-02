@@ -57,7 +57,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const html = document.documentElement;
     html.setAttribute("dir", isRtl ? "rtl" : "ltr");
     html.setAttribute("lang", lang);
-  }, [lang, isRtl]);
+  }, [lang]);
 
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
