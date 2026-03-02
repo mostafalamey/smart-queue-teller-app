@@ -15,11 +15,12 @@
  * Real-time: socket events trigger re-fetches inside useQueue.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Card } from "./ui/card";
 import { Spinner } from "./ui/spinner";
 import { useQueue } from "../hooks/useQueue";
 import { ActionPanel } from "./ActionPanel";
+import { TransferDialog } from "./TransferDialog";
 import { cn } from "../lib/utils";
 import type { QueueTicket, WaitingTicket } from "../data/types";
 import {
@@ -29,6 +30,7 @@ import {
   MonitorCheck,
   ClockArrowUp,
   RefreshCcw,
+  ArrowRightLeft,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -383,14 +385,49 @@ export function QueueDashboard() {
     actionError,
     serviceId,
     refresh,
+    provider,
     callNext,
     startServing,
     recall,
     skipNoShow,
     complete,
+    transfer,
+    isTransferInFlight,
+    transferError,
+    clearTransferError,
   } = useQueue();
 
   const timer = useServingTimer(currentTicket);
+
+  /* ---- Transfer dialog state ------------------------------------------- */
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [transferSuccessMsg, setTransferSuccessMsg] = useState<string | null>(null);
+
+  // Auto-dismiss the success banner after 6 seconds.
+  useEffect(() => {
+    if (!transferSuccessMsg) return;
+    const t = setTimeout(() => setTransferSuccessMsg(null), 6_000);
+    return () => clearTimeout(t);
+  }, [transferSuccessMsg]);
+
+  const handleOpenTransfer = useCallback(() => {
+    clearTransferError();
+    setIsTransferDialogOpen(true);
+  }, [clearTransferError]);
+
+  const handleTransferConfirm = useCallback(
+    async (params: { departmentId: string; serviceId: string; reasonId: string }) => {
+      const result = await transfer(params);
+      if (result) {
+        setIsTransferDialogOpen(false);
+        setTransferSuccessMsg(
+          `Ticket transferred — new number: ${result.destinationTicket.ticketNumber}`,
+        );
+      }
+      // On failure: transferError is set in useQueue and shown in the dialog.
+    },
+    [transfer],
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
@@ -400,6 +437,21 @@ export function QueueDashboard() {
           message={resolveQueueErrorMessage(error)}
           onRetry={refresh}
         />
+      )}
+
+      {/* Transfer success banner */}
+      {transferSuccessMsg && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-600">
+          <ArrowRightLeft size={14} className="shrink-0" />
+          <span className="flex-1">{transferSuccessMsg}</span>
+          <button
+            type="button"
+            onClick={() => setTransferSuccessMsg(null)}
+            className="ml-2 text-xs text-emerald-500/60 hover:text-emerald-500"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {/* Summary metrics */}
@@ -453,6 +505,7 @@ export function QueueDashboard() {
                   onRecall={() => void recall()}
                   onSkipNoShow={() => void skipNoShow()}
                   onComplete={() => void complete()}
+                  onTransfer={handleOpenTransfer}
                 />
               }
             />
@@ -462,6 +515,35 @@ export function QueueDashboard() {
           <div className="flex flex-1 flex-col overflow-hidden">
             <WaitingList tickets={waitingTickets} isLoading={isLoading} />
           </div>
+        </div>
+      )}
+
+      {/* Transfer dialog */}
+      {isTransferDialogOpen && currentTicket && serviceId && (
+        <TransferDialog
+          ticket={currentTicket}
+          currentServiceId={serviceId}
+          provider={provider}
+          isConfirming={isTransferInFlight}
+          submitError={transferError?.message ?? null}
+          onConfirm={(params) => void handleTransferConfirm(params)}
+          onClose={() => setIsTransferDialogOpen(false)}
+        />
+      )}
+
+      {/* Transfer error rendered inside dialog — propagated via transferError in useQueue.
+           If the dialog is closed mid-error, show it in an inline banner. */}
+      {!isTransferDialogOpen && transferError && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-500">
+          <ArrowRightLeft size={14} className="shrink-0" />
+          <span className="flex-1">{transferError.message ?? "Transfer failed"}</span>
+          <button
+            type="button"
+            onClick={clearTransferError}
+            className="ml-2 text-xs text-red-400 hover:text-red-500"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

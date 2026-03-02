@@ -46,6 +46,7 @@ export interface ActionPanelProps {
   onRecall(): void;
   onSkipNoShow(): void;
   onComplete(): void;
+  onTransfer(): void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -97,6 +98,7 @@ export function ActionPanel({
   onRecall,
   onSkipNoShow,
   onComplete,
+  onTransfer,
 }: ActionPanelProps) {
   // Snapshot stored when the teller initiates the No-Show confirmation.
   // Using a snapshot (not the live currentTicket) means:
@@ -257,6 +259,21 @@ export function ActionPanel({
               <Key label="F4" />
             </Button>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "w-full border-blue-500/30 text-blue-500",
+              "hover:bg-blue-500/10 hover:text-blue-500",
+            )}
+            disabled={disabled}
+            onClick={onTransfer}
+          >
+            <ArrowRightLeft size={13} />
+            Transfer
+            <Key label="F6" />
+          </Button>
         </>
       ) : isServing ? (
         /* ── Ticket SERVING: Complete is primary.
@@ -273,13 +290,15 @@ export function ActionPanel({
             <Key label="F5" />
           </Button>
 
-          {/* Transfer — stub until Phase 6.5 */}
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-muted-foreground"
-            disabled={true}
-            title="Transfer — available in Phase 6.5"
+            className={cn(
+              "w-full border-blue-500/30 text-blue-500",
+              "hover:bg-blue-500/10 hover:text-blue-500",
+            )}
+            disabled={disabled}
+            onClick={onTransfer}
           >
             <ArrowRightLeft size={13} />
             Transfer

@@ -468,13 +468,17 @@ Backend teller mutation
 
 #### Deliverables
 
-- [ ] **Transfer API method** (in `data/teller-provider.ts`):
-  - `transfer(ticketId, { departmentId, serviceId, ticketDate })` → `POST /teller/transfer`
+- [x] **Transfer API method** (in `data/teller-provider.ts`):
+  - `transfer(ticketId, { departmentId, serviceId, ticketDate, reasonId })` → `POST /teller/transfer`
   - Returns `{ sourceTicket, destinationTicket }`
-- [ ] **Department/Service data** (in `data/teller-provider.ts`):
+- [x] **Department/Service data** (in `data/teller-provider.ts`):
   - `getDepartments()` → `GET /departments` (all active departments)
   - `getServices(departmentId)` → `GET /departments/:id/services` (active services)
-- [ ] **Transfer Dialog** (`components/TransferDialog.tsx`):
+- [x] **Transfer reasons data** (in `data/teller-provider.ts`):
+  - `getTransferReasons()` → `GET /transfer-reasons` (active reasons, sorted by `sortOrder`)
+  - Returns `{ id, nameEn, nameAr }[]`
+  - Cached in the dialog session (fetched once on open)
+- [x] **Transfer Dialog** (`components/TransferDialog.tsx`):
   - Modal overlay triggered by "Transfer" button
   - **Step 1:** Select destination department (dropdown/list)
     - Shows all departments except current (or all + highlight current)
@@ -482,12 +486,16 @@ Backend teller mutation
   - **Step 2:** Select destination service (dropdown/list, filtered by department)
     - Cannot select the same service the ticket is already in
     - Shows ticket prefix for disambiguation
-  - **Confirm** button with summary: "Transfer {ticketNumber} to {serviceName}?"
+  - **Step 3:** Select transfer reason (required dropdown)
+    - Populated from `GET /transfer-reasons` (hospital-managed, Admin-configurable)
+    - Bilingual labels (Arabic/English)
+    - Required — Confirm button disabled until a reason is selected
+  - **Confirm** button with summary: "Transfer {ticketNumber} to {serviceName}?" (reason shown)
   - **Cancel** button to close dialog
   - Loading state during transfer API call
   - Success: show new ticket number at destination, clear current ticket
   - Error: display error, keep dialog open for retry
-- [ ] **Transfer feedback**:
+- [x] **Transfer feedback**:
   - Success toast: "Ticket transferred → New number: {destinationTicketNumber}"
   - Source ticket transitions to `TRANSFERRED_OUT` (terminal for this station)
   - Queue refreshes automatically
@@ -500,10 +508,12 @@ Backend teller mutation
 
 #### Done Criteria
 - Teller can open transfer dialog from a CALLED or SERVING ticket.
-- Department → Service selection flow works.
+- Department → Service → Reason selection flow works.
+- Transfer reason is required — cannot confirm without selecting one.
 - Transfer succeeds and shows new destination ticket number.
 - Current ticket clears after transfer.
 - Cannot transfer to the same service.
+- Transfer reason recorded in event payload for audit/analytics.
 
 ---
 
@@ -720,7 +730,7 @@ interface TellerDataProvider {
 | `/teller/start-serving` | `{ ticketId }` | `QueueTicket` | CALLED → SERVING |
 | `/teller/skip-no-show` | `{ ticketId }` | `QueueTicket` | CALLED/SERVING → NO_SHOW (terminal) |
 | `/teller/complete` | `{ ticketId }` | `QueueTicket` | SERVING → COMPLETED (terminal) |
-| `/teller/transfer` | `{ ticketId, destination: { departmentId, serviceId, ticketDate } }` | `{ sourceTicket, destinationTicket }` | Source → TRANSFERRED_OUT |
+| `/teller/transfer` | `{ ticketId, destination: { departmentId, serviceId, ticketDate }, reasonId }` | `{ sourceTicket, destinationTicket }` | Source → TRANSFERRED_OUT; reasonId required |
 | `/teller/change-priority` | `{ ticketId, priorityCategoryId, priorityWeight }` | 200 OK | Only WAITING tickets; not used by STAFF |
 
 ### Queue & Reference Endpoints
@@ -730,6 +740,7 @@ interface TellerDataProvider {
 | GET | `/queue/services/:serviceId/summary` | Queue counts + now-serving | Scoped read |
 | GET | `/departments` | Department list | Scoped reads |
 | GET | `/departments/:id/services` | Service list | Scoped reads |
+| GET | `/transfer-reasons` | Active transfer reasons (sorted by sortOrder) | Staff+ auth required |
 
 ### Error Response Shape
 
@@ -854,8 +865,8 @@ Update this table as implementation proceeds.
 | 6.1 | Authentication & Token Management | Done | 2026-03-01 | 2026-03-01 |
 | 6.2 | Station Binding & Session Bootstrap | Done | 2026-03-01 | 2026-03-01 |
 | 6.3 | Queue Dashboard & Real-Time Updates | Done | 2026-03-01 | 2026-03-01 |
-| 6.4 | Teller Action Panel (Core Operations) | Not Started | | |
-| 6.5 | Transfer Flow | Not Started | | |
+| 6.4 | Teller Action Panel (Core Operations) | Done | 2026-03-01 | 2026-03-01 |
+| 6.5 | Transfer Flow | Done | 2026-03-02 | 2026-03-02 |
 | 6.6 | Keyboard Shortcuts & Peripheral Support | Not Started | | |
 | 6.7 | Error Handling, Offline States & Edge Cases | Not Started | | |
 | 6.8 | Polish, Testing & Packaging | Not Started | | |

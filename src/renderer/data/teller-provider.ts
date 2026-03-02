@@ -22,6 +22,7 @@ import type {
   QueueTicket,
   Service,
   TransferInput,
+  TransferReason,
   TransferResult,
   WaitingTicket,
 } from "./types";
@@ -47,6 +48,8 @@ export interface TellerProvider {
   /* Reference data */
   getDepartments(): Promise<Department[]>;
   getServices(departmentId: string): Promise<Service[]>;
+  /** Active transfer reasons sorted by sortOrder (hospital-managed). */
+  getTransferReasons(): Promise<TransferReason[]>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -131,6 +134,7 @@ export function createTellerProvider(apiClient: ApiClient): TellerProvider {
       return apiClient.post<TransferResult>("/teller/transfer", {
         ticketId: input.ticketId,
         destination: input.destination,
+        reasonId: input.reasonId,
       });
     },
 
@@ -144,6 +148,10 @@ export function createTellerProvider(apiClient: ApiClient): TellerProvider {
       return apiClient.get<Service[]>(
         `/departments/${encodeURIComponent(departmentId)}/services`,
       );
+    },
+
+    async getTransferReasons(): Promise<TransferReason[]> {
+      return apiClient.get<TransferReason[]>("/transfer-reasons");
     },
   };
 
@@ -304,6 +312,17 @@ export function createMockTellerProvider(): TellerProvider {
       return [
         { id: "mock-service-001", nameEn: "General Medicine", nameAr: "الطب العام", ticketPrefix: "G", departmentId, isActive: true },
         { id: "mock-service-002", nameEn: "Cardiology", nameAr: "قسم القلب", ticketPrefix: "C", departmentId, isActive: true },
+      ];
+    },
+
+    async getTransferReasons(): Promise<TransferReason[]> {
+      await mockDelay(150);
+      return [
+        { id: "mock-reason-001", nameEn: "Wrong service", nameAr: "خدمة خاطئة" },
+        { id: "mock-reason-002", nameEn: "Additional tests required", nameAr: "فحوصات إضافية" },
+        { id: "mock-reason-003", nameEn: "Doctor referral", nameAr: "إحالة طبيب" },
+        { id: "mock-reason-004", nameEn: "Specialist consultation", nameAr: "استشارة متخصص" },
+        { id: "mock-reason-005", nameEn: "Other", nameAr: "أخرى" },
       ];
     },
   };

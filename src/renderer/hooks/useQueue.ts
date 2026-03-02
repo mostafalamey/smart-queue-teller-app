@@ -21,7 +21,7 @@ import {
 import { useAuth } from "./useAuth";
 import { useStation } from "./useStation";
 import { useSocketContext } from "../providers/SocketContext";
-import type { ApiError, ApiErrorCode, QueueSummary, QueueTicket, WaitingTicket } from "../data/types";
+import type { ApiError, ApiErrorCode, QueueSummary, QueueTicket, WaitingTicket, TransferResult } from "../data/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Type guard                                                                */
@@ -77,6 +77,12 @@ export interface UseQueueReturn extends QueueState {
   recall(): Promise<void>;
   skipNoShow(): Promise<void>;
   complete(): Promise<void>;
+  /* Phase 6.5 transfer */
+  transfer(params: { departmentId: string; serviceId: string; reasonId: string }): Promise<TransferResult | null>;
+  /** True while the transfer API call is in-flight (separate from isActionInFlight). */
+  isTransferInFlight: boolean;
+  transferError: ApiError | null;
+  clearTransferError(): void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -126,6 +132,13 @@ export function useQueue(): UseQueueReturn {
   // before any await so duplicate mutations are always blocked.
   const actionInFlightRef = useRef(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
+
+  /* ---- Transfer-specific in-flight state ------------------------------- */
+  const [isTransferInFlight, setIsTransferInFlight] = useState(false);
+  const transferInFlightRef = useRef(false);
+  const [transferError, setTransferError] = useState<ApiError | null>(null);
+
+  const clearTransferError = useCallback(() => setTransferError(null), []);
 
   const setCurrentTicket = useCallback((t: QueueTicket | null) => {
     currentTicketRef.current = t;
@@ -266,6 +279,53 @@ export function useQueue(): UseQueueReturn {
     });
   }, [runAction]);
 
+  /* ---- Transfer handler -------------------------------------------------- */
+
+  const transferHandler = useCallback(
+    async (params: {
+      departmentId: string;
+      serviceId: string;
+      reasonId: string;
+    }): Promise<TransferResult | null> => {
+      const ticketId = currentTicketRef.current?.id;
+      if (!ticketId) return null;
+      if (transferInFlightRef.current) return null;
+
+      transferInFlightRef.current = true;
+      setIsTransferInFlight(true);
+      setTransferError(null);
+
+      try {
+        const result = await providerRef.current!.transfer({
+          ticketId,
+          destination: {
+            departmentId: params.departmentId,
+            serviceId: params.serviceId,
+            // Default to today's ISO date (midnight UTC) as the ticket date bucket.
+            ticketDate: new Date().toISOString().split("T")[0] + "T00:00:00.000Z",
+          },
+          reasonId: params.reasonId,
+        });
+        // Transfer is terminal for this station — clear the current ticket.
+        setCurrentTicket(null);
+        void fetchAll();
+        return result;
+      } catch (err: unknown) {
+        setTransferError(
+          isApiError(err)
+            ? err
+            : { code: "UNKNOWN", message: "Transfer failed" },
+        );
+        void fetchAll();
+        return null;
+      } finally {
+        transferInFlightRef.current = false;
+        setIsTransferInFlight(false);
+      }
+    },
+    [fetchAll, setCurrentTicket],
+  );
+
   /* ---- Initial fetch ---------------------------------------------------- */
 
   useEffect(() => {
@@ -305,5 +365,9 @@ export function useQueue(): UseQueueReturn {
     recall: recallHandler,
     skipNoShow: skipNoShowHandler,
     complete: completeHandler,
+    transfer: transferHandler,
+    isTransferInFlight,
+    transferError,
+    clearTransferError,
   };
 }

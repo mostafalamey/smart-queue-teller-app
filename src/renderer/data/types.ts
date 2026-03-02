@@ -159,6 +159,13 @@ export interface StationBinding {
 /*  Transfer                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** Hospital-managed reason for transferring a ticket (from GET /transfer-reasons). */
+export interface TransferReason {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+}
+
 export interface TransferInput {
   ticketId: string;
   destination: {
@@ -167,6 +174,8 @@ export interface TransferInput {
     /** ISO date string — defaults to today */
     ticketDate?: string;
   };
+  /** Required: teller must select a reason before confirming the transfer. */
+  reasonId: string;
 }
 
 export interface TransferResult {
@@ -191,6 +200,7 @@ export type ApiErrorCode =
   | "STATION_NOT_FOUND"
   | "DEVICE_NOT_CONFIGURED"
   | "ACTIVE_TICKET_EXISTS"
+  | "INVALID_TRANSFER_REASON"
   | "NETWORK_ERROR"
   | "TIMEOUT"
   | "UNKNOWN";
@@ -230,4 +240,5 @@ export interface TellerDataProvider {
   /* Reference data */
   getDepartments(): Promise<Department[]>;
   getServices(departmentId: string): Promise<Service[]>;
+  getTransferReasons(): Promise<TransferReason[]>;
 }
