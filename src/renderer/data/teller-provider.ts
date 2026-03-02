@@ -7,9 +7,9 @@
  *
  * Teller-action endpoints (Phase 6.4 — fully implemented so they can be
  * wired up in the action panel without touching this file again):
- *   POST /teller/call-next         (auto-fires start-serving internally)
- *   POST /teller/recall            (auto-re-fires start-serving internally)
- *   POST /teller/start-serving     (internal — not a user-facing action)
+ *   POST /teller/call-next         → ticket returned with status CALLED
+ *   POST /teller/start-serving     → ticket returned with status SERVING (explicit user action)
+ *   POST /teller/recall            → re-announces patient; ticket status unchanged
  *   POST /teller/skip-no-show
  *   POST /teller/complete
  *   POST /teller/transfer
@@ -38,7 +38,7 @@ export interface TellerProvider {
   /* Teller actions */
   callNext(serviceId: string): Promise<QueueTicket>;
   recall(ticketId: string): Promise<QueueTicket>;
-  /** Internal — do not expose as a user action or keyboard shortcut. */
+  /** Explicit user action: transitions CALLED → SERVING and sets servingStartedAt. */
   startServing(ticketId: string): Promise<QueueTicket>;
   skipNoShow(ticketId: string): Promise<QueueTicket>;
   complete(ticketId: string): Promise<QueueTicket>;
@@ -102,27 +102,17 @@ export function createTellerProvider(apiClient: ApiClient): TellerProvider {
     /* ---- Teller actions --------------------------------------------------- */
 
     async callNext(serviceId: string): Promise<QueueTicket> {
-      const ticket = await apiClient.post<QueueTicket>("/teller/call-next", {
-        serviceId,
-      });
-      // Silent auto-transition: CALLED → SERVING immediately after call-next.
-      // The teller never sees the CALLED state. startServing failure is logged
-      // but does not block the UI — the teller sees the ticket as SERVING.
-      await provider.startServing(ticket.id).catch((err: unknown) => {
-        console.error("[teller] start-serving after call-next failed:", err);
-      });
-      return ticket;
+      // Returns a CALLED ticket. The teller must explicitly click
+      // "Start Serving" (POST /teller/start-serving) once the patient
+      // arrives at the counter to transition the ticket to SERVING.
+      return apiClient.post<QueueTicket>("/teller/call-next", { serviceId });
     },
 
     async recall(ticketId: string): Promise<QueueTicket> {
-      const ticket = await apiClient.post<QueueTicket>("/teller/recall", {
-        ticketId,
-      });
-      // Re-fire start-serving so servingStartedAt is reset to recall time.
-      await provider.startServing(ticketId).catch((err: unknown) => {
-        console.error("[teller] start-serving after recall failed:", err);
-      });
-      return ticket;
+      // Backend only inserts a RECALLED event; ticket status and timestamps
+      // are unchanged. The teller clicks "Start Serving" again once the
+      // patient returns to the counter, which resets servingStartedAt.
+      return apiClient.post<QueueTicket>("/teller/recall", { ticketId });
     },
 
     async startServing(ticketId: string): Promise<QueueTicket> {
@@ -225,15 +215,15 @@ export function createMockTellerProvider(): TellerProvider {
       await mockDelay(400);
       const next = waiting.shift();
       if (!next) throw { code: "QUEUE_EMPTY", message: "No patients waiting in queue" };
+      // Returns CALLED — teller must explicitly click Start Serving.
       currentTicket = {
         id: next.id,
         ticketNumber: next.ticketNumber,
-        status: "SERVING",
+        status: "CALLED",
         serviceId: "mock-service-001",
         stationId: "mock-station-001",
         priorityWeight: next.priorityWeight,
         calledAt: new Date().toISOString(),
-        servingStartedAt: new Date().toISOString(),
         createdAt: next.createdAt,
         patientPhone: "05****5678",
       };
@@ -243,14 +233,19 @@ export function createMockTellerProvider(): TellerProvider {
     async recall(_ticketId: string): Promise<QueueTicket> {
       await mockDelay(300);
       if (!currentTicket) throw { code: "TICKET_NOT_FOUND", message: "No active ticket" };
-      currentTicket = { ...currentTicket, lastRecalledAt: new Date().toISOString() };
+      // Backend only records the event; status and timestamps unchanged.
       return currentTicket;
     },
 
     async startServing(ticketId: string): Promise<QueueTicket> {
-      await mockDelay(100);
+      await mockDelay(200);
       if (!currentTicket || currentTicket.id !== ticketId)
         throw { code: "TICKET_NOT_FOUND", message: "Ticket not found" };
+      currentTicket = {
+        ...currentTicket,
+        status: "SERVING",
+        servingStartedAt: new Date().toISOString(),
+      };
       return currentTicket;
     },
 

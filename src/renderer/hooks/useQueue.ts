@@ -21,7 +21,29 @@ import {
 import { useAuth } from "./useAuth";
 import { useStation } from "./useStation";
 import { useSocketContext } from "../providers/SocketContext";
-import type { ApiError, QueueSummary, WaitingTicket } from "../data/types";
+import type { ApiError, ApiErrorCode, QueueSummary, WaitingTicket } from "../data/types";
+
+/* -------------------------------------------------------------------------- */
+/*  Type guard                                                                */
+/* -------------------------------------------------------------------------- */
+
+const KNOWN_API_ERROR_CODES = new Set<ApiErrorCode>([
+  "INVALID_REQUEST", "INVALID_CREDENTIALS", "FORBIDDEN", "SESSION_EXPIRED",
+  "ACCOUNT_LOCKED", "ROLE_SELECTION_REQUIRED", "QUEUE_EMPTY",
+  "INVALID_STATUS_TRANSITION", "TICKET_NOT_FOUND", "STATION_NOT_FOUND",
+  "DEVICE_NOT_CONFIGURED", "ACTIVE_TICKET_EXISTS", "NETWORK_ERROR",
+  "TIMEOUT", "UNKNOWN",
+]);
+
+function isApiError(e: unknown): e is ApiError {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    typeof (e as Record<string, unknown>).code === "string" &&
+    KNOWN_API_ERROR_CODES.has((e as Record<string, unknown>).code as ApiErrorCode) &&
+    typeof (e as Record<string, unknown>).message === "string"
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -112,11 +134,13 @@ export function useQueue(): UseQueueReturn {
         lastRefreshedAt: new Date(),
       });
     } catch (err: unknown) {
-      const apiError = err as ApiError | null;
+      const apiError: ApiError = isApiError(err)
+        ? err
+        : { code: "UNKNOWN", message: "Failed to fetch queue data" };
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: apiError ?? { code: "UNKNOWN", message: "Failed to fetch queue data" },
+        error: apiError,
       }));
     }
   }, []);

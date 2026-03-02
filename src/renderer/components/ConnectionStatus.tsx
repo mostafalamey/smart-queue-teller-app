@@ -59,6 +59,8 @@ export function ConnectionStatus({ className }: ConnectionStatusProps) {
       )}
       title={title}
       aria-label={title}
+      role="status"
+      aria-live="polite"
     >
       <span className={dotClass} />
       <span className="text-xs text-muted-foreground">{label}</span>

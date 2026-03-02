@@ -56,7 +56,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const { socket, connectionState, lastConnectedAt } = useSocket({
     apiBaseUrl,
-    getAccessToken,
+    accessToken: getAccessToken(),
     serviceId: binding?.serviceId ?? null,
     stationId: binding?.stationId ?? null,
     // Only connect when auth is established and service/station bindings exist.

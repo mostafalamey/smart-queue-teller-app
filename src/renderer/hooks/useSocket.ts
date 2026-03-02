@@ -24,8 +24,10 @@ export type ConnectionState = "connected" | "connecting" | "disconnected";
 export interface UseSocketOptions {
   /** Base URL of the backend, e.g. "http://localhost:3000" — no trailing slash. */
   apiBaseUrl: string;
-  /** Returns the current in-memory access token (or null). */
-  getAccessToken: () => string | null;
+  /** Current in-memory access token (or null). Passed as a value so the
+   *  token-update effect can declare it as an explicit dependency and only
+   *  run when the token actually rotates, not after every render. */
+  accessToken: string | null;
   /** Service room to subscribe to after connecting. */
   serviceId: string | null;
   /** Station room to subscribe to after connecting. */
@@ -46,7 +48,7 @@ export interface UseSocketReturn {
 
 export function useSocket({
   apiBaseUrl,
-  getAccessToken,
+  accessToken,
   serviceId,
   stationId,
   enabled,
@@ -61,6 +63,11 @@ export function useSocket({
   const serviceIdRef = useRef<string | null>(serviceId);
   const stationIdRef = useRef<string | null>(stationId);
 
+  // Keep the token in a ref so the socket lifecycle effect can read the
+  // latest value on connect without taking a dep on it (which would tear
+  // down and recreate the socket on every token rotation).
+  const accessTokenRef = useRef<string | null>(accessToken);
+
   useEffect(() => {
     serviceIdRef.current = serviceId;
   }, [serviceId]);
@@ -68,6 +75,10 @@ export function useSocket({
   useEffect(() => {
     stationIdRef.current = stationId;
   }, [stationId]);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   /** Emits room-subscription events for the current service and station. */
   const subscribeToRooms = useCallback((socket: Socket) => {
@@ -91,7 +102,7 @@ export function useSocket({
       return;
     }
 
-    const token = getAccessToken();
+    const token = accessTokenRef.current;
     // autoConnect:false prevents the socket from dialling immediately on
     // construction. We defer the actual connect() call by one tick so that
     // React StrictMode's mount→unmount→remount cycle can cancel the timer
@@ -167,9 +178,8 @@ export function useSocket({
 
   useEffect(() => {
     if (!socketRef.current) return;
-    const token = getAccessToken();
-    (socketRef.current.auth as Record<string, unknown>).token = token;
-  });
+    (socketRef.current.auth as Record<string, unknown>).token = accessToken;
+  }, [accessToken]);
 
   return {
     socket: socketRef.current,

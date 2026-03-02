@@ -89,8 +89,9 @@ function useServingTimer(ticket: QueueTicket | null | undefined): string {
       return;
     }
 
-    // Start from lastRecalledAt if available, otherwise calledAt.
-    const anchorIso = ticket.lastRecalledAt ?? ticket.calledAt;
+    // Anchor on servingStartedAt once the teller clicks Start Serving;
+    // fall back to calledAt while the ticket is still in CALLED state.
+    const anchorIso = ticket.servingStartedAt ?? ticket.calledAt;
     const anchor = anchorIso ? new Date(anchorIso).getTime() : Date.now();
 
     const update = () => {
@@ -102,7 +103,7 @@ function useServingTimer(ticket: QueueTicket | null | undefined): string {
     return () => {
       if (tickerRef.current) clearInterval(tickerRef.current);
     };
-  }, [ticket?.id, ticket?.lastRecalledAt, ticket?.calledAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ticket?.id, ticket?.servingStartedAt, ticket?.calledAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
@@ -198,9 +199,15 @@ function CurrentTicketCard({ ticket, timer }: CurrentTicketCardProps) {
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-8">
         {/* Status + priority */}
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-500 ring-1 ring-blue-500/25">
-            Serving
-          </span>
+          {ticket.status === "SERVING" ? (
+            <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-500 ring-1 ring-blue-500/25">
+              Serving
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-500 ring-1 ring-amber-400/30">
+              Called
+            </span>
+          )}
           <PriorityBadge weight={ticket.priorityWeight} />
         </div>
 
@@ -225,7 +232,9 @@ function CurrentTicketCard({ ticket, timer }: CurrentTicketCardProps) {
         )}
       </div>
 
-      {/* Phase 6.4: ActionPanel mounts here */}
+      {/* Phase 6.4: ActionPanel mounts here.
+           CALLED  → primary action is Start Serving
+           SERVING → actions are Recall, Skip, Complete, Transfer */}
       <div className="border-t border-border/50 px-4 py-3">
         <p className="text-center text-[10px] text-muted-foreground/40 uppercase tracking-widest">
           Action panel — Phase 6.4
@@ -287,8 +296,10 @@ function WaitingList({ tickets, isLoading }: WaitingListProps) {
                       priority === "vip" && "bg-amber-400",
                       priority === "normal" && "bg-muted-foreground/30",
                     )}
-                    aria-label={PRIORITY_LABEL[priority]}
+                    // aria-label={PRIORITY_LABEL[priority]}
+                    aria-hidden="true"
                   />
+                   <span className="sr-only">{PRIORITY_LABEL[priority]} priority</span>
 
                   {/* Ticket number */}
                   <span className="flex-1 font-mono text-sm font-semibold tabular-nums text-foreground">
@@ -328,6 +339,7 @@ function ErrorBanner({
       <XCircle size={15} className="shrink-0 text-red-500" />
       <span className="flex-1 text-muted-foreground">{message}</span>
       <button
+        type="button"
         onClick={onRetry}
         className="flex items-center gap-1 text-xs text-primary hover:underline"
       >
@@ -336,6 +348,25 @@ function ErrorBanner({
       </button>
     </div>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Error message resolver                                                    */
+/* -------------------------------------------------------------------------- */
+
+function resolveQueueErrorMessage(error: { code?: string; message?: string }): string {
+  switch (error.code) {
+    case "QUEUE_EMPTY":
+      return "No patients waiting in queue";
+    case "TICKET_NOT_FOUND":
+      return "Ticket no longer exists. Refreshing queue state may help.";
+    case "INVALID_STATUS_TRANSITION":
+      return "This action is not available for the current ticket status.";
+    case "FORBIDDEN":
+      return "Service mismatch or insufficient permissions for this station.";
+    default:
+      return error.message ?? "Failed to load queue data";
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -358,7 +389,7 @@ export function QueueDashboard() {
       {/* Error banner */}
       {error && (
         <ErrorBanner
-          message={error.message ?? "Failed to load queue data"}
+          message={resolveQueueErrorMessage(error)}
           onRetry={refresh}
         />
       )}
