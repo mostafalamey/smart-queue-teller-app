@@ -154,6 +154,9 @@ export function ActionPanel({
   // All actions are disabled when the network is offline to prevent mutations
   // that cannot be confirmed with real-time feedback.
   const disabled = isActionInFlight || isOffline;
+  // showBusy drives spinner vs icon — only true when an API call is actually
+  // in-flight, never when the button is merely offline-disabled.
+  const showBusy = isActionInFlight;
   const hasTicket = !!currentTicket;
   const isCalled = currentTicket?.status === "CALLED";
   const isServing = currentTicket?.status === "SERVING";
@@ -215,7 +218,7 @@ export function ActionPanel({
               disabled={disabled}
               onClick={handleSkipConfirm}
             >
-              {disabled ? <Spinner size={14} /> : <UserX size={14} />}
+              {showBusy ? <Spinner size={14} /> : <UserX size={14} />}
               Confirm No-Show
             </Button>
             <Button
@@ -237,7 +240,7 @@ export function ActionPanel({
           disabled={disabled || !serviceId}
           onClick={handleCallNext}
         >
-          {disabled ? <Spinner size={16} /> : <PhoneCall size={16} />}
+          {showBusy ? <Spinner size={16} /> : <PhoneCall size={16} />}
           Call Next
           <Key label="F1" />
         </Button>
@@ -250,7 +253,7 @@ export function ActionPanel({
             disabled={disabled}
             onClick={handleStartServing}
           >
-            {disabled ? <Spinner size={16} /> : <Play size={16} />}
+            {showBusy ? <Spinner size={16} /> : <Play size={16} />}
             Start Serving
             <Key label="F2" />
           </Button>
@@ -318,7 +321,7 @@ export function ActionPanel({
             disabled={disabled}
             onClick={handleComplete}
           >
-            {disabled ? <Spinner size={16} /> : <CheckCircle2 size={16} />}
+            {showBusy ? <Spinner size={16} /> : <CheckCircle2 size={16} />}
             Complete
             <Key label="F5" />
           </Button>

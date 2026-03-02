@@ -604,7 +604,7 @@ Backend teller mutation
   - React class component wrapping the root `<App />`
   - Crash screen with error detail (collapsible) and "Restart App" button
   - `componentDidCatch` logs to console
-  - In-place state reset attempted before full page reload
+  - In-place state reset attempted before full-page reload
 
 #### Done Criteria
 - App gracefully handles network disconnection and reconnection.
@@ -622,12 +622,13 @@ Backend teller mutation
 #### Deliverables
 
 - [ ] **UI/UX polish**:
+  - log-out functionality
   - Bilingual support (Arabic/English) with RTL layout for Arabic
   - Language toggle in station info header
   - Consistent color scheme matching Smart Queue branding
   - Loading skeletons for initial data fetch
   - Smooth transitions between states (login → dashboard, action feedback)
-  - Responsive layout for different screen sizes (1024×768 minimum)
+  - Responsive layout for different screen sizes (640x480 minimum)
   - Dark mode support (optional, if time permits)
 - [ ] **Accessibility**:
   - Screen reader labels on all interactive elements

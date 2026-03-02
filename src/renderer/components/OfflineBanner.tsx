@@ -16,6 +16,7 @@ import { cn } from "../lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSec <= 0) return "just now";
   if (diffSec < 60) return `${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;

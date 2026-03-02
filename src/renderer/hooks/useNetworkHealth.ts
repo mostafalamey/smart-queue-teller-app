@@ -76,7 +76,14 @@ export function useNetworkHealth({
     } catch (err) {
       // AbortError means this check was intentionally cancelled — don't
       // flip httpReachable to false in that case, just bail silently.
-      if (err instanceof Error && err.name === "AbortError") return;
+      // Use a name-based check rather than `instanceof Error` because
+      // Electron's Chromium fetch throws a DOMException (not an Error
+      // subclass) on abort; both carry name === "AbortError".
+      const isAbort =
+        (err instanceof DOMException && err.name === "AbortError") ||
+        (err instanceof Error && err.name === "AbortError") ||
+        (typeof err === "object" && err !== null && (err as { name?: unknown }).name === "AbortError");
+      if (isAbort) return;
       setHttpReachable(false);
     }
     setLastCheckedAt(new Date());
