@@ -378,14 +378,14 @@ Backend teller mutation
 
 #### Deliverables
 
-- [ ] **Teller API methods** (in `data/teller-provider.ts`):
+- [x] **Teller API methods** (in `data/teller-provider.ts`):
   - `callNext(serviceId)` → `POST /teller/call-next` → returns ticket with status `CALLED`
   - `startServing(ticketId)` → `POST /teller/start-serving` → transitions `CALLED → SERVING`, sets `servingStartedAt` (explicit user action)
   - `recall(ticketId)` → `POST /teller/recall` → re-announces patient; backend records RECALLED event only; ticket status and timestamps unchanged
   - `skipNoShow(ticketId)` → `POST /teller/skip-no-show` → returns ticket
   - `complete(ticketId)` → `POST /teller/complete` → returns ticket
   - All methods use the authenticated API client
-- [ ] **Action Panel** (`components/ActionPanel.tsx`):
+- [x] **Action Panel** (`components/ActionPanel.tsx`):
   - **Call Next** button:
     - Enabled when: no active ticket at this station
     - On click: calls `callNext(serviceId)` → ticket displayed as CALLED (amber badge); "Start Serving" becomes the primary action
@@ -403,30 +403,32 @@ Backend teller mutation
     - Teller clicks "Start Serving" once the patient arrives to transition to SERVING
     - Visual: amber/warning color
   - **Skip / No-Show** button:
-    - Enabled when: active ticket is present
-    - Shows confirmation dialog: "Mark ticket {number} as no-show?"
-    - On confirm: marks ticket as `NO_SHOW` (terminal)
+    - Enabled when: active ticket is in CALLED state only (patient has not yet arrived at counter)
+    - Not available when SERVING — patient is physically present and being served
+    - Shows inline confirmation strip using a **stable ticket snapshot** (id + ticketNumber captured at click time); strip auto-cancels via `useEffect` if the ticket id or status changes while confirming
+    - On confirm: guards against ticket mismatch before calling skip; marks ticket as `NO_SHOW` (terminal)
     - On success: clears current ticket, ready for next call
     - Visual: red/destructive color
   - **Complete** button:
-    - Enabled when: active ticket is present
+    - Enabled when: active ticket is in SERVING state only
     - Direct action (no confirmation)
     - On success: marks ticket as `COMPLETED` (terminal), clears current ticket
     - Visual: green/success color
-- [ ] **Current Ticket Card** (`components/CurrentTicket.tsx`):
+- [x] **Current Ticket Card** (embedded in `components/QueueDashboard.tsx` as `CurrentTicketCard`):
   - Large ticket number display
   - Status badge — **amber "Called"** when `status === CALLED`; **blue "Serving"** when `status === SERVING`
   - Priority badge
   - **Serving timer**: anchors on `servingStartedAt` once the teller clicks Start Serving; falls back to `calledAt` while ticket is still in CALLED state
   - Patient phone (partially masked)
   - Action buttons contextually arranged below the ticket (Start Serving is primary when CALLED)
-- [ ] **Action feedback**:
+- [x] **Action feedback**:
   - Loading spinners on buttons during API calls
-  - Success toast/notification on action completion
-  - Error toast with actionable message on failure
-  - Disable all action buttons during an in-flight operation (prevent double-clicks)
-- [ ] **Queue state management** (`hooks/useQueue.ts`):
-  - Tracks: `currentTicket`, `queueSummary`, `waitingTickets`, `isLoading`
+  - Error bar auto-displays on action failure (inline in ActionPanel)
+  - All action buttons disabled during in-flight operation; synchronous `actionInFlightRef` prevents re-entry even before React re-renders the disabled state
+- [x] **Queue state management** (`hooks/useQueue.ts`):
+  - Tracks: `currentTicket` (optimistic), `isActionInFlight`, `actionError`, `queueSummary`, `waitingTickets`, `isLoading`
+  - `runAction` wrapper: synchronous `actionInFlightRef` re-entry guard; in-flight flag; error capture; optimistic state update; `fetchAll` in `finally` (runs on both success and failure to reconcile stale state)
+  - `fetchAll` syncs `currentTicket` from `summary.nowServing` on every poll/WS-triggered refresh
   - Updates on: API responses, WebSocket events
   - Handles: stale state reconciliation when WebSocket reconnects
 
@@ -436,13 +438,13 @@ Backend teller mutation
 |---|---|---|---|---|---|---|
 | No active ticket | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Ticket CALLED | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Ticket SERVING | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Ticket SERVING | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 #### Error Handling
 
 | Error Code | Display Message | Action |
 |---|---|---|
-| `QUEUE_EMPTY` | "No patients waiting in queue" | Informational toast |
+| `QUEUE_EMPTY` | "No patients waiting in queue" | Inline error bar in ActionPanel |
 | `INVALID_STATUS_TRANSITION` | "This action is not available for the current ticket status" | Refresh ticket state |
 | `TICKET_NOT_FOUND` | "Ticket no longer exists" | Clear current ticket |
 | `STATION_NOT_FOUND` | "Station binding error — contact IT" | Block actions |
@@ -454,7 +456,7 @@ Backend teller mutation
 - CALLED state displays amber badge; SERVING state displays blue badge.
 - Serving timer anchors on `servingStartedAt` (set when teller clicks Start Serving); counts from `calledAt` while in CALLED state.
 - Action buttons enable/disable correctly per the Action State Matrix.
-- Confirmation dialog appears for Skip.
+- Inline confirmation strip appears for Skip / No-Show (CALLED state only).
 - WebSocket events refresh the UI after actions.
 - Error states display meaningful messages.
 
@@ -771,7 +773,7 @@ Status codes: 400 (bad request), 401 (unauthorized), 403 (forbidden), 404 (not f
 | **F1** | Call Next | No active ticket at this station |
 | **F2** | Start Serving | Active ticket in CALLED state |
 | **F3** | Recall | Active ticket in CALLED state |
-| **F4** | Skip / No-Show | Active ticket present |
+| **F4** | Skip / No-Show | Active ticket in CALLED state |
 | **F5** | Complete | Active ticket present (SERVING) |
 | **F6** | Transfer | Active ticket present |
 | **F12** | Show shortcut reference | Always |
