@@ -264,6 +264,42 @@ export function AuthProvider({
   }, []);
 
   /* ---------------------------------------------------------------------- */
+  /*  Listen for `station:mismatch` from useQueue                          */
+  /*                                                                        */
+  /*  Fired when a teller action returns STATION_NOT_FOUND, indicating IT   */
+  /*  changed this device's station assignment while the teller was logged  */
+  /*  in. Force a clean re-login so the new station claim is embedded in    */
+  /*  the next JWT.                                                         */
+  /* ---------------------------------------------------------------------- */
+
+  useEffect(() => {
+    const handleStationMismatch = () => {
+      clearRefreshTimer();
+      accessTokenRef.current = null;
+      void window.tellerRuntime?.secureStorage
+        ?.delete(SECURE_STORAGE_REFRESH_TOKEN_KEY)
+        ?.catch(() => undefined);
+      setState({
+        user: null,
+        accessToken: null,
+        accessTokenExpiresInSeconds: null,
+        isAuthenticated: false,
+        isBootstrapping: false,
+        isLoading: false,
+        error: {
+          code: "STATION_NOT_FOUND",
+          message:
+            "Station configuration has changed. Please sign in again.",
+        },
+      });
+    };
+    window.addEventListener("station:mismatch", handleStationMismatch);
+    return () => {
+      window.removeEventListener("station:mismatch", handleStationMismatch);
+    };
+  }, [clearRefreshTimer]);
+
+  /* ---------------------------------------------------------------------- */
   /*  Cleanup on unmount                                                     */
   /* ---------------------------------------------------------------------- */
 

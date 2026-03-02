@@ -523,7 +523,7 @@ Backend teller mutation
 
 #### Deliverables
 
-- [ ] **Shortcut definitions** (`lib/shortcuts.ts`):
+- [x] **Shortcut definitions** (`lib/shortcuts.ts`):
   ```typescript
   export const SHORTCUTS = {
     CALL_NEXT:     { key: 'F1', label: 'F1' },
@@ -534,19 +534,19 @@ Backend teller mutation
     TRANSFER:      { key: 'F6', label: 'F6' },
   } as const;
   ```
-- [ ] **Keyboard shortcut hook** (`hooks/useKeyboardShortcuts.ts`):
+- [x] **Keyboard shortcut hook** (`hooks/useKeyboardShortcuts.ts`):
   - Registers global `keydown` listeners via Electron's `before-input-event` (main process) or renderer `window.addEventListener`
   - Maps F-keys to action handlers
   - Respects action enable/disable state (does not fire disabled actions)
   - Ignores shortcuts when modal dialogs or text inputs are focused
   - Debounce rapid repeat presses (300ms)
-- [ ] **Shortcut hints on buttons**:
+- [x] **Shortcut hints on buttons**:
   - Each action button displays its shortcut key label (e.g., "Call Next (F1)")
   - Small badge or tooltip format
-- [ ] **Shortcut reference panel** (accessible via `F12` or menu):
+- [x] **Shortcut reference panel** (accessible via `F12` or menu):
   - Lists all shortcuts in a compact overlay
   - Dismissable with `Escape`
-- [ ] **Electron main process shortcut forwarding**:
+- [x] **Electron main process shortcut forwarding**:
   - Intercept F-key presses in `before-input-event`
   - Forward to renderer via IPC if needed (or let renderer handle directly)
   - Prevent default browser behavior for F-keys (e.g., F5 refresh)
@@ -571,37 +571,40 @@ Backend teller mutation
 
 #### Deliverables
 
-- [ ] **Network health monitoring**:
-  - Periodic health check (`GET /health` or similar) every 30 seconds
+- [x] **Network health monitoring** (`hooks/useNetworkHealth.ts`, `providers/NetworkHealthContext.tsx`):
+  - Periodic health check (`GET /health`) every 30 seconds
   - WebSocket connection state as primary indicator
   - Combined status: `online`, `degraded` (HTTP ok, WS down), `offline`
-- [ ] **Offline mode behavior**:
-  - When offline: display prominent "Connection Lost" banner
-  - Disable all queue action buttons
-  - Show last-known queue state with "Last updated: {timestamp}" label
-  - Auto-retry connection in background
-  - On reconnect: full queue state refresh + re-subscribe WebSocket rooms
-- [ ] **Session expiry handling**:
-  - If refresh token is rejected (expired/revoked): force logout with message
-  - If access token refresh fails transiently: retry 2x before forcing logout
-  - Clear stale tokens on auth errors
-- [ ] **Concurrent teller conflict handling**:
-  - If `callNext` returns a ticket already called by another station → refresh and show info
-  - If action on a ticket returns 404 or status conflict → refresh current ticket state
-  - Show "Ticket was handled by another teller" message when appropriate
-- [ ] **Edge case: app left idle**:
-  - Maintain WebSocket keepalive
-  - On resume from sleep/hibernate: force reconnect + full state refresh
-  - Detect document visibility changes as reconnect trigger
-- [ ] **Edge case: station re-binding**:
-  - If IT changes station binding while teller is logged in:
-    - Detect on next API call (station mismatch)
-    - Force re-login to pick up new binding
-    - Display informational message
-- [ ] **Error boundary**:
-  - React error boundary wrapping the main app
-  - Crash screen with "Restart App" button
-  - Log errors to console (and optionally to backend audit endpoint)
+  - HTTP ping also fires on `window.online` event (browser network interface recovery)
+- [x] **Offline mode behavior** (`components/OfflineBanner.tsx`, `components/QueueDashboard.tsx`, `components/ActionPanel.tsx`):
+  - When offline: displays prominent "Connection Lost" banner with `WifiOff` icon
+  - All queue action buttons disabled when `networkStatus === "offline"`
+  - Keyboard shortcuts also disabled when offline
+  - Shows last-queue-refresh timestamp so teller knows how stale the data is
+  - When degraded: amber "Degraded Connection" banner; actions still available
+  - Auto-retry handled by Socket.IO built-in reconnect + visibility/online listeners
+  - On reconnect: full queue state refresh + re-subscribe WebSocket rooms (existing behavior)
+- [x] **Session expiry handling** (`providers/AuthContext.tsx`):
+  - If refresh token is rejected (expired/revoked): force logout with message (existing `auth:unauthorized` event)
+  - If access token refresh fails transiently: retry 2x before forcing logout (existing ApiClient behavior)
+  - Clear stale tokens on auth errors (existing behavior hardened in Phase 6.1)
+- [x] **Concurrent teller conflict handling** (`hooks/useQueue.ts`):
+  - `TICKET_NOT_FOUND` in `runAction`: clear `currentTicket` immediately + refresh
+  - 409 Conflict (non-domain error): overrides message to "This ticket was already handled by another teller."
+  - All race conditions ultimately reconciled by `fetchAll()` in the `finally` block
+- [x] **Edge case: app left idle** (`hooks/useSocket.ts`):
+  - Socket.IO built-in keepalive/reconnection handles long idle periods
+  - On resume from sleep/hibernate: `visibilitychange` → `visible` triggers `socket.connect()` if disconnected
+  - `window.online` browser event also triggers immediate reconnect attempt
+- [x] **Edge case: station re-binding** (`hooks/useQueue.ts`, `providers/AuthContext.tsx`, `components/LoginForm.tsx`):
+  - `STATION_NOT_FOUND` in `runAction` fires `station:mismatch` DOM event
+  - `AuthContext` listens for `station:mismatch` → clears tokens + forces re-login with `STATION_NOT_FOUND` error code
+  - `LoginForm` `resolveErrorMessage` maps `STATION_NOT_FOUND` → bilingual "Station configuration has changed. Please sign in again." message
+- [x] **Error boundary** (`components/ErrorBoundary.tsx`):
+  - React class component wrapping the root `<App />`
+  - Crash screen with error detail (collapsible) and "Restart App" button
+  - `componentDidCatch` logs to console
+  - In-place state reset attempted before full page reload
 
 #### Done Criteria
 - App gracefully handles network disconnection and reconnection.
@@ -867,8 +870,8 @@ Update this table as implementation proceeds.
 | 6.3 | Queue Dashboard & Real-Time Updates | Done | 2026-03-01 | 2026-03-01 |
 | 6.4 | Teller Action Panel (Core Operations) | Done | 2026-03-01 | 2026-03-01 |
 | 6.5 | Transfer Flow | Done | 2026-03-02 | 2026-03-02 |
-| 6.6 | Keyboard Shortcuts & Peripheral Support | Not Started | | |
-| 6.7 | Error Handling, Offline States & Edge Cases | Not Started | | |
+| 6.6 | Keyboard Shortcuts & Peripheral Support | Done | 2026-03-02 | 2026-03-02 |
+| 6.7 | Error Handling, Offline States & Edge Cases | Done | 2026-03-02 | 2026-03-02 |
 | 6.8 | Polish, Testing & Packaging | Not Started | | |
 
 ---

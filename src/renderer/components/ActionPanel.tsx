@@ -41,6 +41,11 @@ export interface ActionPanelProps {
   isActionInFlight: boolean;
   /** Last action error; null when no error or after a new action clears it. */
   actionError: ApiError | null;
+  /**
+   * When true all action buttons are disabled and a subtle offline label is
+   * shown. Set by the caller from NetworkHealthContext ("offline" status).
+   */
+  isOffline?: boolean;
   onCallNext(): void;
   onStartServing(): void;
   onRecall(): void;
@@ -99,6 +104,7 @@ export function ActionPanel({
   serviceId,
   isActionInFlight,
   actionError,
+  isOffline = false,
   onCallNext,
   onStartServing,
   onRecall,
@@ -145,7 +151,9 @@ export function ActionPanel({
     };
   }, [currentTicket, skipNoShowTriggerRef]);
 
-  const disabled = isActionInFlight;
+  // All actions are disabled when the network is offline to prevent mutations
+  // that cannot be confirmed with real-time feedback.
+  const disabled = isActionInFlight || isOffline;
   const hasTicket = !!currentTicket;
   const isCalled = currentTicket?.status === "CALLED";
   const isServing = currentTicket?.status === "SERVING";

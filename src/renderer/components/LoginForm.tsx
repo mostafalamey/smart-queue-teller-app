@@ -42,6 +42,8 @@ const strings = {
     invalidCredentials: "Invalid email or password.",
     forbidden: "Your account does not have teller access.",
     sessionExpired: "Your session has expired. Please sign in again.",
+    stationChanged:
+      "Station configuration has changed. Please sign in again.",
     lockedPrefix: "Account locked.",
     lockedSuffix: " Try again in",
     lockedMinutes: (s: number) => {
@@ -70,6 +72,8 @@ const strings = {
     invalidCredentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
     forbidden: "لا يملك حسابك صلاحية الوصول إلى هذا التطبيق.",
     sessionExpired: "انتهت صلاحية جلستك. يرجى تسجيل الدخول مجدداً.",
+    stationChanged:
+      "تغيّر إعداد المحطة. يرجى تسجيل الدخول مجدداً.",
     lockedPrefix: "الحساب مقفل.",
     lockedSuffix: " يمكنك إعادة المحاولة بعد",
     lockedMinutes: (s: number) => {
@@ -103,6 +107,8 @@ function resolveErrorMessage(
       return t.forbidden;
     case "SESSION_EXPIRED":
       return t.sessionExpired;
+    case "STATION_NOT_FOUND":
+      return t.stationChanged;
     case "ACCOUNT_LOCKED": {
       const secs = err.lockedUntilSeconds ?? 0;
       return `${t.lockedPrefix}${t.lockedSuffix}${t.lockedMinutes(secs)}.`;
