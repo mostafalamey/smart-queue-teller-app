@@ -22,7 +22,9 @@ import { useQueue } from "../hooks/useQueue";
 import { ActionPanel } from "./ActionPanel";
 import { TransferDialog } from "./TransferDialog";
 import { ShortcutReferencePanel } from "./ShortcutReferencePanel";
+import { OfflineBanner } from "./OfflineBanner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useNetworkHealthContext } from "../providers/NetworkHealthContext";
 import { cn } from "../lib/utils";
 import type { QueueTicket, WaitingTicket } from "../data/types";
 import {
@@ -384,6 +386,7 @@ export function QueueDashboard() {
     isLoading,
     error,
     isActionInFlight,
+    lastRefreshedAt,
     actionError,
     serviceId,
     refresh,
@@ -398,6 +401,10 @@ export function QueueDashboard() {
     transferError,
     clearTransferError,
   } = useQueue();
+
+  /* ---- Network health (offline / degraded mode) ------------------------- */
+  const { networkStatus } = useNetworkHealthContext();
+  const isOffline = networkStatus === "offline";
 
   const timer = useServingTimer(currentTicket);
 
@@ -440,12 +447,12 @@ export function QueueDashboard() {
       onEscape:       () => setIsShortcutPanelOpen(false),
     },
     enabled: {
-      callNext:     !currentTicket && !!serviceId && !anyActionInFlight,
-      startServing: !!isCalled  && !anyActionInFlight,
-      recall:       !!isCalled  && !anyActionInFlight,
-      skipNoShow:   !!isCalled  && !anyActionInFlight,
-      complete:     !!isServing && !anyActionInFlight,
-      transfer:     (!!isCalled || !!isServing) && !anyActionInFlight,
+      callNext:     !currentTicket && !!serviceId && !anyActionInFlight && !isOffline,
+      startServing: !!isCalled  && !anyActionInFlight && !isOffline,
+      recall:       !!isCalled  && !anyActionInFlight && !isOffline,
+      skipNoShow:   !!isCalled  && !anyActionInFlight && !isOffline,
+      complete:     !!isServing && !anyActionInFlight && !isOffline,
+      transfer:     (!!isCalled || !!isServing) && !anyActionInFlight && !isOffline,
     },
     isModalOpen: isTransferDialogOpen,
   });
@@ -466,6 +473,9 @@ export function QueueDashboard() {
 
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+      {/* Offline / degraded network banner */}
+      <OfflineBanner lastRefreshedAt={lastRefreshedAt} />
+
       {/* Error banner */}
       {error && (
         <ErrorBanner
@@ -535,6 +545,7 @@ export function QueueDashboard() {
                   serviceId={serviceId}
                   isActionInFlight={isActionInFlight}
                   actionError={actionError}
+                  isOffline={isOffline}
                   onCallNext={() => void callNext()}
                   onStartServing={() => void startServing()}
                   onRecall={() => void recall()}

@@ -221,11 +221,38 @@ export function useQueue(): UseQueueReturn {
         const ticket = await fn();
         setCurrentTicket(ticket);
       } catch (err: unknown) {
-        setActionError(
-          isApiError(err)
-            ? err
-            : { code: "UNKNOWN", message: "Action failed" },
-        );
+        const apiErr: ApiError = isApiError(err)
+          ? err
+          : { code: "UNKNOWN", message: "Action failed" };
+
+        // TICKET_NOT_FOUND — the ticket no longer exists (another teller
+        // completed/transferred it). Clear the local ticket immediately so the
+        // UI doesn't show a stale "active" card.
+        if (apiErr.code === "TICKET_NOT_FOUND") {
+          setCurrentTicket(null);
+        }
+
+        // STATION_NOT_FOUND — IT has changed the station binding while the
+        // teller was logged in. Fire a DOM event so AuthContext can force a
+        // clean re-login with the corrected station context.
+        if (apiErr.code === "STATION_NOT_FOUND") {
+          window.dispatchEvent(new CustomEvent("station:mismatch"));
+        }
+
+        // 409 Conflict with no domain-level error code — treat as a concurrent
+        // teller race (another teller acted on the same ticket first).
+        const isTellerConflict =
+          apiErr.status === 409 &&
+          apiErr.code !== "INVALID_STATUS_TRANSITION" &&
+          apiErr.code !== "ACTIVE_TICKET_EXISTS";
+        if (isTellerConflict) {
+          setActionError({
+            ...apiErr,
+            message: "This ticket was already handled by another teller.",
+          });
+        } else {
+          setActionError(apiErr);
+        }
       } finally {
         actionInFlightRef.current = false;
         setIsActionInFlight(false);

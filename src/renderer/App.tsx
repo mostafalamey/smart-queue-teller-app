@@ -18,6 +18,7 @@
 import { AuthProvider } from "./providers/AuthContext";
 import { StationProvider, useStation } from "./providers/StationContext";
 import { SocketProvider } from "./providers/SocketContext";
+import { NetworkHealthProvider } from "./providers/NetworkHealthContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
 import { ForcePasswordChange } from "./components/ForcePasswordChange";
@@ -26,6 +27,7 @@ import { DeviceNotConfigured } from "./components/DeviceNotConfigured";
 // unregistered/error devices never trigger a silent-refresh bootstrap.
 import { StationInfo } from "./components/StationInfo";
 import { QueueDashboard } from "./components/QueueDashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Spinner } from "./components/ui/spinner";
 import { MonitorDot } from "lucide-react";
 
@@ -64,10 +66,12 @@ function TellerApp() {
   /* ---- Authenticated — queue dashboard ---------------------------------- */
   return (
     <SocketProvider>
-      <div className="flex h-screen flex-col bg-background text-foreground">
-        <StationInfo tellerName={user?.email} />
-        <QueueDashboard />
-      </div>
+      <NetworkHealthProvider>
+        <div className="flex h-screen flex-col bg-background text-foreground">
+          <StationInfo tellerName={user?.email} />
+          <QueueDashboard />
+        </div>
+      </NetworkHealthProvider>
     </SocketProvider>
   );
 }
@@ -105,8 +109,10 @@ function AuthBridge() {
 
 export function App() {
   return (
-    <StationProvider>
-      <AuthBridge />
-    </StationProvider>
+    <ErrorBoundary>
+      <StationProvider>
+        <AuthBridge />
+      </StationProvider>
+    </ErrorBoundary>
   );
 }

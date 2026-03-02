@@ -174,6 +174,45 @@ export function useSocket({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, apiBaseUrl, subscribeToRooms]);
 
+  /* ---- Reconnect on page visibility restore and browser "online" event --- */
+  //
+  // When the OS wakes from sleep/hibernate the document becomes visible again
+  // (and/or the browser fires `window.online`). If the socket lost its
+  // connection silently during the sleep, socket.io-client's built-in
+  // reconnection may be backoff-delayed. Explicitly calling socket.connect()
+  // here fast-tracks the reconnect so the teller sees live data as soon as
+  // the screen wakes.
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const forceReconnect = () => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      // Only act when not already connected/connecting to avoid duplicate dials.
+      if (socket.connected) return;
+      socket.connect();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        forceReconnect();
+      }
+    };
+
+    const handleOnline = () => {
+      forceReconnect();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [enabled]);
+
   /* ---- Keep socket auth token current after silent refresh --------------- */
 
   useEffect(() => {
