@@ -15,6 +15,31 @@
   }
 }
 
+/* Smooth direction transition for RTL ↔ LTR */
+[dir] {
+  transition: direction 3s;
+}
+
+/* Fade-in animation for view transitions */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Slide-up for banners and panels */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
 :root {
   --background: oklch(0.9821 0 0);
   --foreground: oklch(0.3211 0 0);

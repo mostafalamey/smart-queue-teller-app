@@ -19,6 +19,7 @@ import { AuthProvider } from "./providers/AuthContext";
 import { StationProvider, useStation } from "./providers/StationContext";
 import { SocketProvider } from "./providers/SocketContext";
 import { NetworkHealthProvider } from "./providers/NetworkHealthContext";
+import { LanguageProvider, useLanguage } from "./providers/LanguageContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
 import { ForcePasswordChange } from "./components/ForcePasswordChange";
@@ -53,6 +54,7 @@ function FullScreenLoader() {
 
 function TellerApp() {
   const { isBootstrapping, isAuthenticated, user } = useAuth();
+  const { lang } = useLanguage();
 
   /* Auth bootstrap still in flight */
   if (isBootstrapping) return <FullScreenLoader />;
@@ -110,9 +112,11 @@ function AuthBridge() {
 export function App() {
   return (
     <ErrorBoundary>
-      <StationProvider>
-        <AuthBridge />
-      </StationProvider>
+      <LanguageProvider>
+        <StationProvider>
+          <AuthBridge />
+        </StationProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

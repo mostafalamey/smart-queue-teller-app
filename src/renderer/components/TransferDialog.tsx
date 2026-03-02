@@ -26,6 +26,8 @@ import { Spinner } from "./ui/spinner";
 import { cn } from "../lib/utils";
 import type { Department, QueueTicket, Service, TransferReason } from "../data/types";
 import type { TellerProvider } from "../data/teller-provider";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings, { type DashboardStrings } from "../lib/i18n";
 import {
   X,
   ChevronLeft,
@@ -62,11 +64,11 @@ type Step = 1 | 2 | 3;
 /* -------------------------------------------------------------------------- */
 
 /** Horizontal step indicator */
-function StepBadges({ step }: { step: Step }) {
+function StepBadges({ step, t }: { step: Step; t: DashboardStrings }) {
   const steps: { num: Step; label: string }[] = [
-    { num: 1, label: "Department" },
-    { num: 2, label: "Service" },
-    { num: 3, label: "Reason" },
+    { num: 1, label: t.department },
+    { num: 2, label: t.service },
+    { num: 3, label: t.reason },
   ];
 
   return (
@@ -182,6 +184,16 @@ export function TransferDialog({
   onConfirm,
   onClose,
 }: TransferDialogProps) {
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
+
+  /** Returns the display name in the active locale, falling back to the other. */
+  const locName = (entity: { nameEn: string; nameAr: string }) =>
+    lang === "ar" ? (entity.nameAr || entity.nameEn) : (entity.nameEn || entity.nameAr);
+  /** Returns the secondary (opposite) language name for the bilingual hint. */
+  const altName = (entity: { nameEn: string; nameAr: string }) =>
+    lang === "ar" ? entity.nameEn : entity.nameAr;
+
   const [step, setStep] = useState<Step>(1);
 
   /* ---- Selections -------------------------------------------------------- */
@@ -217,7 +229,7 @@ export function TransferDialog({
       })
       .catch(() => {
         if (!mountedRef.current) return;
-        setFetchError("Failed to load transfer data. Please close and try again.");
+        setFetchError(t.fetchTransferError);
         setIsLoadingDepts(false);
         setIsLoadingReasons(false);
       });
@@ -241,7 +253,7 @@ export function TransferDialog({
         setServices(svcList.filter((s) => s.id !== currentServiceId));
       } catch {
         if (!mountedRef.current) return;
-        setFetchError("Failed to load services for this department.");
+        setFetchError(t.fetchServicesError);
       } finally {
         if (mountedRef.current) setIsLoadingServices(false);
       }
@@ -300,14 +312,49 @@ export function TransferDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isConfirming, onClose]);
 
+  /* ---- Focus trap -------------------------------------------------------- */
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  const FOCUSABLE =
+    "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
+
+  // Focus the first element once on dialog mount only.
+  useEffect(() => {
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-register the Tab-wrap handler whenever the step's focusable set changes.
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const focusable = el.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", handleTab);
+    return () => window.removeEventListener("keydown", handleTab);
+  }, [step]);
+
   /* ---- Confirm is only enabled once a reason is selected --------------- */
   const canConfirm = !!selectedDept && !!selectedService && !!selectedReason;
 
   /* ---- Step headings ---------------------------------------------------- */
   const STEP_HEADING: Record<Step, string> = {
-    1: "Select Department",
-    2: `Services in ${selectedDept?.nameEn ?? "—"}`,
-    3: "Reason for Transfer",
+    1: t.selectDepartment,
+    2: t.servicesIn(selectedDept ? locName(selectedDept) : "—"),
+    3: t.reasonForTransfer,
   };
 
   return (
@@ -319,24 +366,31 @@ export function TransferDialog({
         if (e.target === e.currentTarget && !isConfirming) onClose();
       }}
     >
-      <Card className="relative flex w-[480px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+      <Card
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.transferTicket}
+        className="relative flex w-[480px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl animate-slide-up"
+      >
         {/* ── Header ── */}
         <div className="flex items-start justify-between border-b border-border/50 px-5 py-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
               <ArrowRightLeft size={15} className="text-primary" />
-              <span className="text-sm font-semibold">Transfer Ticket</span>
+              <span className="text-sm font-semibold">{t.transferTicket}</span>
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-bold text-foreground">
                 {ticket.ticketNumber}
               </span>
             </div>
-            <StepBadges step={step} />
+            <StepBadges step={step} t={t} />
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isConfirming}
             className="rounded-lg p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label={t.cancel}
           >
             <X size={15} />
           </button>
@@ -374,12 +428,12 @@ export function TransferDialog({
                 getId={(d) => d.id}
                 renderItem={(d) => (
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium">{d.nameEn}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{d.nameAr}</span>
+                    <span className="font-medium">{locName(d)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{altName(d)}</span>
                   </div>
                 )}
                 onSelect={handleSelectDept}
-                emptyMessage="No departments available"
+                emptyMessage={t.noDepartments}
                 isLoading={isLoadingDepts}
               />
             )}
@@ -395,13 +449,13 @@ export function TransferDialog({
                       <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
                         {s.ticketPrefix}
                       </span>
-                      <span className="font-medium">{s.nameEn}</span>
+                      <span className="font-medium">{locName(s)}</span>
                     </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">{s.nameAr}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{altName(s)}</span>
                   </div>
                 )}
                 onSelect={handleSelectService}
-                emptyMessage="No other services available in this department"
+                emptyMessage={t.noServices}
                 isLoading={isLoadingServices}
               />
             )}
@@ -410,11 +464,11 @@ export function TransferDialog({
               <>
                 {/* Summary of selected destination */}
                 <div className="mb-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-                  <p className="text-[11px] text-muted-foreground">Transferring to</p>
+                  <p className="text-[11px] text-muted-foreground">{t.transferringTo}</p>
                   <p className="mt-0.5 text-sm font-semibold text-foreground">
-                    {selectedService?.nameEn}
+                    {selectedService ? locName(selectedService) : "—"}
                     <span className="ml-1.5 font-normal text-muted-foreground">
-                      — {selectedDept?.nameEn}
+                      — {selectedDept ? locName(selectedDept) : "—"}
                     </span>
                   </p>
                 </div>
@@ -425,12 +479,12 @@ export function TransferDialog({
                   getId={(r) => r.id}
                   renderItem={(r) => (
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium">{r.nameEn}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{r.nameAr}</span>
+                      <span className="font-medium">{locName(r)}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{altName(r)}</span>
                     </div>
                   )}
                   onSelect={handleSelectReason}
-                  emptyMessage="No transfer reasons configured"
+                  emptyMessage={t.noReasons}
                   isLoading={isLoadingReasons}
                 />
               </>
@@ -449,7 +503,7 @@ export function TransferDialog({
               onClick={onClose}
               className="text-muted-foreground"
             >
-              Cancel
+              {t.cancel}
             </Button>
           ) : (
             <Button
@@ -460,7 +514,7 @@ export function TransferDialog({
               className="text-muted-foreground"
             >
               <ChevronLeft size={14} />
-              Back
+              {t.back}
             </Button>
           )}
 
@@ -477,7 +531,7 @@ export function TransferDialog({
               ) : (
                 <ArrowRightLeft size={14} />
               )}
-              {isConfirming ? "Transferring…" : "Confirm Transfer"}
+              {isConfirming ? t.transferring : t.confirmTransfer}
             </Button>
           )}
         </div>
