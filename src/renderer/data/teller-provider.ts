@@ -151,7 +151,11 @@ export function createTellerProvider(apiClient: ApiClient): TellerProvider {
     },
 
     async getTransferReasons(): Promise<TransferReason[]> {
-      return apiClient.get<TransferReason[]>("/transfer-reasons");
+      // Backend returns { requestId, reasons: [...] } — unwrap the array.
+      const res = await apiClient.get<{ requestId?: string; reasons: TransferReason[] }>(
+        "/transfer-reasons",
+      );
+      return Array.isArray(res) ? res : (res.reasons ?? []);
     },
   };
 
