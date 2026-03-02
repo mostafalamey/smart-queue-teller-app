@@ -193,6 +193,8 @@ function registerIpcHandlers(): void {
   );
 }
 
+const TELLER_FKEYS = new Set(["F1", "F2", "F3", "F4", "F5", "F6", "F12"]);
+
 /* -------------------------------------------------------------------------- */
 /*  Window Creation                                                           */
 /* -------------------------------------------------------------------------- */
@@ -233,7 +235,6 @@ function createWindow(): void {
     // F1–F6, F12 — teller action shortcuts.
     // Prevent Electron/Chrome default behaviours (F5 reload, F12 DevTools, etc.)
     // so they are handled exclusively by the renderer's useKeyboardShortcuts hook.
-    const TELLER_FKEYS = new Set(["F1", "F2", "F3", "F4", "F5", "F6", "F12"]);
     if (!input.control && !input.alt && !input.meta && TELLER_FKEYS.has(input.key)) {
       _event.preventDefault();
     }

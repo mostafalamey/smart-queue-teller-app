@@ -52,7 +52,7 @@ export interface ActionPanelProps {
    * caller (e.g. F4 keypress) can open the inline confirmation strip without
    * knowing ActionPanel's internal state.
    */
-  skipNoShowTriggerRef?: React.RefObject<(() => void) | null>;
+  skipNoShowTriggerRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -136,12 +136,10 @@ export function ActionPanel({
       setConfirmingSkipFor({ id: currentTicket.id, ticketNumber: currentTicket.ticketNumber });
     };
     if (skipNoShowTriggerRef) {
-      // @ts-expect-error — writing to a RefObject.current from the owner component
       skipNoShowTriggerRef.current = triggerSkipNoShow.current;
     }
     return () => {
       if (skipNoShowTriggerRef) {
-        // @ts-expect-error
         skipNoShowTriggerRef.current = null;
       }
     };

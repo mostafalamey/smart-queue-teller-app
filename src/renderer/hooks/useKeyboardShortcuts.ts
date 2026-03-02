@@ -95,24 +95,26 @@ export function useKeyboardShortcuts({
 
   useEffect(() => {
     handlersRef.current = handlers;
-  });
+  }, [handlers]);
   useEffect(() => {
     enabledRef.current = enabled;
-  });
+  }, [enabled]);
   useEffect(() => {
     isModalOpenRef.current = isModalOpen;
-  });
+  }, [isModalOpen]);
 
   useEffect(() => {
     // Per-key debounce: maps key string → timestamp of last fire.
     const lastFired = new Map<string, number>();
 
-    function shouldDebounce(key: string): boolean {
-      const last = lastFired.get(key) ?? 0;
-      const now = Date.now();
-      if (now - last < DEBOUNCE_MS) return true;
-      lastFired.set(key, now);
-      return false;
+    /** Returns true if the key is still within the debounce window. */
+    function isDebounced(key: string): boolean {
+      return Date.now() - (lastFired.get(key) ?? 0) < DEBOUNCE_MS;
+    }
+
+    /** Stamp the key as fired — called only when a handler is actually invoked. */
+    function stampFired(key: string): void {
+      lastFired.set(key, Date.now());
     }
 
     function handleKeyDown(event: KeyboardEvent): void {
@@ -121,25 +123,24 @@ export function useKeyboardShortcuts({
       // Skip when focus is inside a text entry element.
       if (isInputFocused()) return;
 
-      // Debounce rapid repeated key-holds.
-      if (shouldDebounce(key)) return;
-
       const h = handlersRef.current;
       const en = enabledRef.current;
       const modalOpen = isModalOpenRef.current;
 
       // ── F12: toggle shortcut reference panel — always fires ──────────────
       if (key === SHORTCUTS.SHORTCUT_HELP.key) {
+        if (isDebounced(key)) return;
         event.preventDefault();
+        stampFired(key);
         h.onToggleHelp?.();
         return;
       }
 
       // ── Escape: close panels only when no modal is open ─────────────────
-      // When a modal is open (TransferDialog) its own keydown handler
-      // manages Escape; we step back to avoid a double-close.
       if (key === SHORTCUTS.ESCAPE.key) {
         if (!modalOpen) {
+          if (isDebounced(key)) return;
+          stampFired(key);
           h.onEscape?.();
         }
         return;
@@ -150,38 +151,44 @@ export function useKeyboardShortcuts({
 
       switch (key) {
         case SHORTCUTS.CALL_NEXT.key:
-          if (en.callNext) {
+          if (en.callNext && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onCallNext?.();
           }
           break;
         case SHORTCUTS.START_SERVING.key:
-          if (en.startServing) {
+          if (en.startServing && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onStartServing?.();
           }
           break;
         case SHORTCUTS.RECALL.key:
-          if (en.recall) {
+          if (en.recall && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onRecall?.();
           }
           break;
         case SHORTCUTS.SKIP_NO_SHOW.key:
-          if (en.skipNoShow) {
+          if (en.skipNoShow && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onSkipNoShow?.();
           }
           break;
         case SHORTCUTS.COMPLETE.key:
-          if (en.complete) {
+          if (en.complete && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onComplete?.();
           }
           break;
         case SHORTCUTS.TRANSFER.key:
-          if (en.transfer) {
+          if (en.transfer && !isDebounced(key)) {
             event.preventDefault();
+            stampFired(key);
             h.onTransfer?.();
           }
           break;
