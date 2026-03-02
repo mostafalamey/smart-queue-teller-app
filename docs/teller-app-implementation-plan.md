@@ -405,8 +405,8 @@ Backend teller mutation
   - **Skip / No-Show** button:
     - Enabled when: active ticket is in CALLED state only (patient has not yet arrived at counter)
     - Not available when SERVING — patient is physically present and being served
-    - Shows inline confirmation strip: "Mark ticket {number} as no-show?"
-    - On confirm: marks ticket as `NO_SHOW` (terminal)
+    - Shows inline confirmation strip using a **stable ticket snapshot** (id + ticketNumber captured at click time); strip auto-cancels via `useEffect` if the ticket id or status changes while confirming
+    - On confirm: guards against ticket mismatch before calling skip; marks ticket as `NO_SHOW` (terminal)
     - On success: clears current ticket, ready for next call
     - Visual: red/destructive color
   - **Complete** button:
@@ -424,10 +424,10 @@ Backend teller mutation
 - [x] **Action feedback**:
   - Loading spinners on buttons during API calls
   - Error bar auto-displays on action failure (inline in ActionPanel)
-  - Disable all action buttons during an in-flight operation (prevent double-clicks)
+  - All action buttons disabled during in-flight operation; synchronous `actionInFlightRef` prevents re-entry even before React re-renders the disabled state
 - [x] **Queue state management** (`hooks/useQueue.ts`):
   - Tracks: `currentTicket` (optimistic), `isActionInFlight`, `actionError`, `queueSummary`, `waitingTickets`, `isLoading`
-  - `runAction` wrapper handles in-flight flag, error capture, optimistic state update, and background `fetchAll`
+  - `runAction` wrapper: synchronous `actionInFlightRef` re-entry guard; in-flight flag; error capture; optimistic state update; `fetchAll` in `finally` (runs on both success and failure to reconcile stale state)
   - `fetchAll` syncs `currentTicket` from `summary.nowServing` on every poll/WS-triggered refresh
   - Updates on: API responses, WebSocket events
   - Handles: stale state reconciliation when WebSocket reconnects
@@ -444,7 +444,7 @@ Backend teller mutation
 
 | Error Code | Display Message | Action |
 |---|---|---|
-| `QUEUE_EMPTY` | "No patients waiting in queue" | Informational toast |
+| `QUEUE_EMPTY` | "No patients waiting in queue" | Inline error bar in ActionPanel |
 | `INVALID_STATUS_TRANSITION` | "This action is not available for the current ticket status" | Refresh ticket state |
 | `TICKET_NOT_FOUND` | "Ticket no longer exists" | Clear current ticket |
 | `STATION_NOT_FOUND` | "Station binding error — contact IT" | Block actions |
@@ -456,7 +456,7 @@ Backend teller mutation
 - CALLED state displays amber badge; SERVING state displays blue badge.
 - Serving timer anchors on `servingStartedAt` (set when teller clicks Start Serving); counts from `calledAt` while in CALLED state.
 - Action buttons enable/disable correctly per the Action State Matrix.
-- Confirmation dialog appears for Skip.
+- Inline confirmation strip appears for Skip / No-Show (CALLED state only).
 - WebSocket events refresh the UI after actions.
 - Error states display meaningful messages.
 

@@ -14,7 +14,7 @@
  * implemented in Phase 6.6 (useKeyboardShortcuts).
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 import { cn } from "../lib/utils";
@@ -62,6 +62,10 @@ function resolveActionError(error: ApiError): string {
       return "Action not available for the current ticket status";
     case "STATION_NOT_FOUND":
       return "Station binding error — contact IT";
+    case "FORBIDDEN":
+      return "Service mismatch or insufficient permissions for this station";
+    case "ACTIVE_TICKET_EXISTS":
+      return "You already have an active ticket at this station";
     default:
       return error.message || "Action failed";
   }
@@ -94,7 +98,25 @@ export function ActionPanel({
   onSkipNoShow,
   onComplete,
 }: ActionPanelProps) {
-  const [confirmingSkip, setConfirmingSkip] = useState(false);
+  // Snapshot stored when the teller initiates the No-Show confirmation.
+  // Using a snapshot (not the live currentTicket) means:
+  //  1. The displayed ticket number stays stable even if a WS event races in.
+  //  2. handleSkipConfirm can guard against acting on the wrong ticket.
+  // The useEffect below clears this whenever the ticket id/status changes,
+  // so the strip auto-cancels on any external ticket mutation.
+  const [confirmingSkipFor, setConfirmingSkipFor] = useState<{
+    id: string;
+    ticketNumber: string;
+  } | null>(null);
+  const confirmingSkip = confirmingSkipFor !== null;
+
+  // Reset the inline confirmation strip if the ticket is cleared or its status
+  // changes (e.g. a WebSocket event resolves the ticket while the strip is open).
+  // Without this, the Confirm button would fire onSkipNoShow() with no valid
+  // ticket context and leave the UI in a stuck/confusing state.
+  useEffect(() => {
+    setConfirmingSkipFor(null);
+  }, [currentTicket?.id, currentTicket?.status]);
 
   const disabled = isActionInFlight;
   const hasTicket = !!currentTicket;
@@ -103,23 +125,30 @@ export function ActionPanel({
 
   /* Reset skip confirmation whenever a fresh action is invoked. */
   const handleCallNext = () => {
-    setConfirmingSkip(false);
+    setConfirmingSkipFor(null);
     onCallNext();
   };
   const handleStartServing = () => {
-    setConfirmingSkip(false);
+    setConfirmingSkipFor(null);
     onStartServing();
   };
   const handleRecall = () => {
-    setConfirmingSkip(false);
+    setConfirmingSkipFor(null);
     onRecall();
   };
   const handleComplete = () => {
-    setConfirmingSkip(false);
+    setConfirmingSkipFor(null);
     onComplete();
   };
   const handleSkipConfirm = () => {
-    setConfirmingSkip(false);
+    // Guard: if the live ticket no longer matches the snapshot (a race slipped
+    // past the useEffect reset), cancel silently rather than acting on the
+    // wrong ticket.
+    if (!confirmingSkipFor || currentTicket?.id !== confirmingSkipFor.id) {
+      setConfirmingSkipFor(null);
+      return;
+    }
+    setConfirmingSkipFor(null);
     onSkipNoShow();
   };
 
@@ -139,7 +168,7 @@ export function ActionPanel({
           <p className="text-center text-xs font-medium text-muted-foreground">
             Mark{" "}
             <span className="font-semibold text-foreground">
-              {currentTicket?.ticketNumber}
+              {confirmingSkipFor.ticketNumber}
             </span>{" "}
             as No-Show?
           </p>
@@ -159,7 +188,7 @@ export function ActionPanel({
               size="sm"
               className="flex-1"
               disabled={disabled}
-              onClick={() => setConfirmingSkip(false)}
+              onClick={() => setConfirmingSkipFor(null)}
             >
               Cancel
             </Button>
@@ -215,7 +244,13 @@ export function ActionPanel({
                 "hover:bg-red-500/10 hover:text-red-500",
               )}
               disabled={disabled}
-              onClick={() => setConfirmingSkip(true)}
+              onClick={() =>
+                setConfirmingSkipFor(
+                  currentTicket
+                    ? { id: currentTicket.id, ticketNumber: currentTicket.ticketNumber }
+                    : null,
+                )
+              }
             >
               <UserX size={13} />
               No-Show

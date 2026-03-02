@@ -120,6 +120,11 @@ export function useQueue(): UseQueueReturn {
   const currentTicketRef = useRef<QueueTicket | null>(null);
 
   const [isActionInFlight, setIsActionInFlight] = useState(false);
+  // Mutable ref for synchronous re-entry guard. React state updates are
+  // async — a second click can reach runAction before the re-render that
+  // would disable the button. The ref is checked and set synchronously
+  // before any await so duplicate mutations are always blocked.
+  const actionInFlightRef = useRef(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
 
   const setCurrentTicket = useCallback((t: QueueTicket | null) => {
@@ -192,12 +197,16 @@ export function useQueue(): UseQueueReturn {
    */
   const runAction = useCallback(
     async (fn: () => Promise<QueueTicket | null>) => {
+      // Synchronous guard — blocks re-entry before React can re-render
+      // the disabled button state. The ref is authoritative; the state
+      // value (isActionInFlight) is kept for UI binding only.
+      if (actionInFlightRef.current) return;
+      actionInFlightRef.current = true;
       setIsActionInFlight(true);
       setActionError(null);
       try {
         const ticket = await fn();
         setCurrentTicket(ticket);
-        void fetchAll();
       } catch (err: unknown) {
         setActionError(
           isApiError(err)
@@ -205,7 +214,13 @@ export function useQueue(): UseQueueReturn {
             : { code: "UNKNOWN", message: "Action failed" },
         );
       } finally {
+        actionInFlightRef.current = false;
         setIsActionInFlight(false);
+        // Reconcile queue state on both success and failure.
+        // On success this confirms the optimistic update; on failure
+        // (e.g. TICKET_NOT_FOUND, INVALID_STATUS_TRANSITION) this
+        // corrects any stale currentTicket or summary state.
+        void fetchAll();
       }
     },
     [fetchAll, setCurrentTicket],
