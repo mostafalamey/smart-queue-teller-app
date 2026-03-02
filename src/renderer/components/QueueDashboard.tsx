@@ -21,6 +21,8 @@ import { Spinner } from "./ui/spinner";
 import { useQueue } from "../hooks/useQueue";
 import { ActionPanel } from "./ActionPanel";
 import { TransferDialog } from "./TransferDialog";
+import { ShortcutReferencePanel } from "./ShortcutReferencePanel";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { cn } from "../lib/utils";
 import type { QueueTicket, WaitingTicket } from "../data/types";
 import {
@@ -399,6 +401,12 @@ export function QueueDashboard() {
 
   const timer = useServingTimer(currentTicket);
 
+  /* ---- Skip No-Show trigger ref (bridges F4 → ActionPanel confirmation) -- */
+  const skipNoShowTriggerRef = useRef<(() => void) | null>(null);
+
+  /* ---- Shortcut reference panel state ----------------------------------- */
+  const [isShortcutPanelOpen, setIsShortcutPanelOpen] = useState(false);
+
   /* ---- Transfer dialog state ------------------------------------------- */
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [transferSuccessMsg, setTransferSuccessMsg] = useState<string | null>(null);
@@ -414,6 +422,33 @@ export function QueueDashboard() {
     clearTransferError();
     setIsTransferDialogOpen(true);
   }, [clearTransferError]);
+
+  /* ---- Keyboard shortcuts ----------------------------------------------- */
+  const anyActionInFlight = isActionInFlight || isTransferInFlight;
+  const isCalled = currentTicket?.status === "CALLED";
+  const isServing = currentTicket?.status === "SERVING";
+
+  useKeyboardShortcuts({
+    handlers: {
+      onCallNext:     () => void callNext(),
+      onStartServing: () => void startServing(),
+      onRecall:       () => void recall(),
+      onSkipNoShow:   () => skipNoShowTriggerRef.current?.(),
+      onComplete:     () => void complete(),
+      onTransfer:     handleOpenTransfer,
+      onToggleHelp:   () => setIsShortcutPanelOpen((v) => !v),
+      onEscape:       () => setIsShortcutPanelOpen(false),
+    },
+    enabled: {
+      callNext:     !currentTicket && !!serviceId && !anyActionInFlight,
+      startServing: !!isCalled  && !anyActionInFlight,
+      recall:       !!isCalled  && !anyActionInFlight,
+      skipNoShow:   !!isCalled  && !anyActionInFlight,
+      complete:     !!isServing && !anyActionInFlight,
+      transfer:     (!!isCalled || !!isServing) && !anyActionInFlight,
+    },
+    isModalOpen: isTransferDialogOpen,
+  });
 
   const handleTransferConfirm = useCallback(
     async (params: { departmentId: string; serviceId: string; reasonId: string }) => {
@@ -506,6 +541,7 @@ export function QueueDashboard() {
                   onSkipNoShow={() => void skipNoShow()}
                   onComplete={() => void complete()}
                   onTransfer={handleOpenTransfer}
+                  skipNoShowTriggerRef={skipNoShowTriggerRef}
                 />
               }
             />
@@ -516,6 +552,11 @@ export function QueueDashboard() {
             <WaitingList tickets={waitingTickets} isLoading={isLoading} />
           </div>
         </div>
+      )}
+
+      {/* Shortcut reference panel (F12) */}
+      {isShortcutPanelOpen && (
+        <ShortcutReferencePanel onClose={() => setIsShortcutPanelOpen(false)} />
       )}
 
       {/* Transfer dialog */}

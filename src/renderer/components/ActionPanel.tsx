@@ -14,7 +14,7 @@
  * implemented in Phase 6.6 (useKeyboardShortcuts).
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 import { cn } from "../lib/utils";
@@ -47,6 +47,12 @@ export interface ActionPanelProps {
   onSkipNoShow(): void;
   onComplete(): void;
   onTransfer(): void;
+  /**
+   * Optional ref that Phase 6.6 (keyboard shortcuts) populates so an external
+   * caller (e.g. F4 keypress) can open the inline confirmation strip without
+   * knowing ActionPanel's internal state.
+   */
+  skipNoShowTriggerRef?: React.RefObject<(() => void) | null>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -99,6 +105,7 @@ export function ActionPanel({
   onSkipNoShow,
   onComplete,
   onTransfer,
+  skipNoShowTriggerRef,
 }: ActionPanelProps) {
   // Snapshot stored when the teller initiates the No-Show confirmation.
   // Using a snapshot (not the live currentTicket) means:
@@ -119,6 +126,26 @@ export function ActionPanel({
   useEffect(() => {
     setConfirmingSkipFor(null);
   }, [currentTicket?.id, currentTicket?.status]);
+
+  // Expose a trigger function via ref so keyboard shortcut handler (F4) can
+  // open the confirmation strip without knowing our internal state.
+  const triggerSkipNoShow = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    triggerSkipNoShow.current = () => {
+      if (!currentTicket) return;
+      setConfirmingSkipFor({ id: currentTicket.id, ticketNumber: currentTicket.ticketNumber });
+    };
+    if (skipNoShowTriggerRef) {
+      // @ts-expect-error — writing to a RefObject.current from the owner component
+      skipNoShowTriggerRef.current = triggerSkipNoShow.current;
+    }
+    return () => {
+      if (skipNoShowTriggerRef) {
+        // @ts-expect-error
+        skipNoShowTriggerRef.current = null;
+      }
+    };
+  }, [currentTicket, skipNoShowTriggerRef]);
 
   const disabled = isActionInFlight;
   const hasTicket = !!currentTicket;
