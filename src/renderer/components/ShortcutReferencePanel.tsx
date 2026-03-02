@@ -57,8 +57,8 @@ export function ShortcutReferencePanel({ onClose }: ShortcutReferencePanelProps)
     /* Backdrop */
     <div
       className="fixed inset-0 z-40 flex items-end justify-start bg-background/60 backdrop-blur-sm p-4"
+      role="presentation"
       onClick={onClose}
-      aria-label="Close shortcut reference"
     >
       <Card
         className="w-72 overflow-hidden shadow-2xl ring-1 ring-border/60"
