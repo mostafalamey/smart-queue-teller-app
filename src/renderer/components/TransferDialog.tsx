@@ -26,6 +26,8 @@ import { Spinner } from "./ui/spinner";
 import { cn } from "../lib/utils";
 import type { Department, QueueTicket, Service, TransferReason } from "../data/types";
 import type { TellerProvider } from "../data/teller-provider";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings, { type DashboardStrings } from "../lib/i18n";
 import {
   X,
   ChevronLeft,
@@ -62,11 +64,11 @@ type Step = 1 | 2 | 3;
 /* -------------------------------------------------------------------------- */
 
 /** Horizontal step indicator */
-function StepBadges({ step }: { step: Step }) {
+function StepBadges({ step, t }: { step: Step; t: DashboardStrings }) {
   const steps: { num: Step; label: string }[] = [
-    { num: 1, label: "Department" },
-    { num: 2, label: "Service" },
-    { num: 3, label: "Reason" },
+    { num: 1, label: t.department },
+    { num: 2, label: t.service },
+    { num: 3, label: t.reason },
   ];
 
   return (
@@ -182,6 +184,8 @@ export function TransferDialog({
   onConfirm,
   onClose,
 }: TransferDialogProps) {
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
   const [step, setStep] = useState<Step>(1);
 
   /* ---- Selections -------------------------------------------------------- */
@@ -217,7 +221,7 @@ export function TransferDialog({
       })
       .catch(() => {
         if (!mountedRef.current) return;
-        setFetchError("Failed to load transfer data. Please close and try again.");
+        setFetchError(t.fetchTransferError);
         setIsLoadingDepts(false);
         setIsLoadingReasons(false);
       });
@@ -241,7 +245,7 @@ export function TransferDialog({
         setServices(svcList.filter((s) => s.id !== currentServiceId));
       } catch {
         if (!mountedRef.current) return;
-        setFetchError("Failed to load services for this department.");
+        setFetchError(t.fetchServicesError);
       } finally {
         if (mountedRef.current) setIsLoadingServices(false);
       }
@@ -300,14 +304,45 @@ export function TransferDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isConfirming, onClose]);
 
+  /* ---- Focus trap -------------------------------------------------------- */
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    // Move focus into the dialog on mount.
+    const firstFocusable = el.querySelector<HTMLElement>(
+      "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])",
+    );
+    firstFocusable?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const focusable = el.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", handleTab);
+    return () => window.removeEventListener("keydown", handleTab);
+  }, [step]);
+
   /* ---- Confirm is only enabled once a reason is selected --------------- */
   const canConfirm = !!selectedDept && !!selectedService && !!selectedReason;
 
   /* ---- Step headings ---------------------------------------------------- */
   const STEP_HEADING: Record<Step, string> = {
-    1: "Select Department",
-    2: `Services in ${selectedDept?.nameEn ?? "—"}`,
-    3: "Reason for Transfer",
+    1: t.selectDepartment,
+    2: t.servicesIn(selectedDept?.nameEn ?? "—"),
+    3: t.reasonForTransfer,
   };
 
   return (
@@ -319,24 +354,31 @@ export function TransferDialog({
         if (e.target === e.currentTarget && !isConfirming) onClose();
       }}
     >
-      <Card className="relative flex w-[480px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+      <Card
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.transferTicket}
+        className="relative flex w-[480px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl animate-slide-up"
+      >
         {/* ── Header ── */}
         <div className="flex items-start justify-between border-b border-border/50 px-5 py-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
               <ArrowRightLeft size={15} className="text-primary" />
-              <span className="text-sm font-semibold">Transfer Ticket</span>
+              <span className="text-sm font-semibold">{t.transferTicket}</span>
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-bold text-foreground">
                 {ticket.ticketNumber}
               </span>
             </div>
-            <StepBadges step={step} />
+            <StepBadges step={step} t={t} />
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isConfirming}
             className="rounded-lg p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label={t.cancel}
           >
             <X size={15} />
           </button>
@@ -379,7 +421,7 @@ export function TransferDialog({
                   </div>
                 )}
                 onSelect={handleSelectDept}
-                emptyMessage="No departments available"
+                emptyMessage={t.noDepartments}
                 isLoading={isLoadingDepts}
               />
             )}
@@ -401,7 +443,7 @@ export function TransferDialog({
                   </div>
                 )}
                 onSelect={handleSelectService}
-                emptyMessage="No other services available in this department"
+                emptyMessage={t.noServices}
                 isLoading={isLoadingServices}
               />
             )}
@@ -410,7 +452,7 @@ export function TransferDialog({
               <>
                 {/* Summary of selected destination */}
                 <div className="mb-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-                  <p className="text-[11px] text-muted-foreground">Transferring to</p>
+                  <p className="text-[11px] text-muted-foreground">{t.transferringTo}</p>
                   <p className="mt-0.5 text-sm font-semibold text-foreground">
                     {selectedService?.nameEn}
                     <span className="ml-1.5 font-normal text-muted-foreground">
@@ -430,7 +472,7 @@ export function TransferDialog({
                     </div>
                   )}
                   onSelect={handleSelectReason}
-                  emptyMessage="No transfer reasons configured"
+                  emptyMessage={t.noReasons}
                   isLoading={isLoadingReasons}
                 />
               </>
@@ -449,7 +491,7 @@ export function TransferDialog({
               onClick={onClose}
               className="text-muted-foreground"
             >
-              Cancel
+              {t.cancel}
             </Button>
           ) : (
             <Button
@@ -460,7 +502,7 @@ export function TransferDialog({
               className="text-muted-foreground"
             >
               <ChevronLeft size={14} />
-              Back
+              {t.back}
             </Button>
           )}
 
@@ -477,7 +519,7 @@ export function TransferDialog({
               ) : (
                 <ArrowRightLeft size={14} />
               )}
-              {isConfirming ? "Transferring…" : "Confirm Transfer"}
+              {isConfirming ? t.transferring : t.confirmTransfer}
             </Button>
           )}
         </div>

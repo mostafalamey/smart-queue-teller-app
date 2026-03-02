@@ -11,6 +11,8 @@
 
 import { cn } from "../lib/utils";
 import { useSocketContext } from "../providers/SocketContext";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings from "../lib/i18n";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -30,6 +32,8 @@ interface ConnectionStatusProps {
 
 export function ConnectionStatus({ className }: ConnectionStatusProps) {
   const { connectionState, lastConnectedAt } = useSocketContext();
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
 
   const isConnected = connectionState === "connected";
   const isConnecting = connectionState === "connecting";
@@ -42,13 +46,13 @@ export function ConnectionStatus({ className }: ConnectionStatusProps) {
   );
 
   const label = isConnected
-    ? "Live"
+    ? t.connLive
     : isConnecting
-      ? "Reconnecting…"
-      : "Offline";
+      ? t.connReconnecting
+      : t.connOffline;
 
   const title = lastConnectedAt
-    ? `${label} · Last connected ${formatTime(lastConnectedAt)}`
+    ? `${label} · ${t.connLastAt} ${formatTime(lastConnectedAt)}`
     : label;
 
   return (

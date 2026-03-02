@@ -9,6 +9,8 @@ import { useEffect } from "react";
 import { Card } from "./ui/card";
 import { SHORTCUTS } from "../lib/shortcuts";
 import { Keyboard, X } from "lucide-react";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings from "../lib/i18n";
 
 /* -------------------------------------------------------------------------- */
 /*  Reference rows                                                            */
@@ -20,17 +22,6 @@ interface ShortcutRowEntry {
   condition: string;
 }
 
-const ROWS: ShortcutRowEntry[] = [
-  { keyLabel: SHORTCUTS.CALL_NEXT.label,     action: "Call Next",                condition: "No active ticket" },
-  { keyLabel: SHORTCUTS.START_SERVING.label, action: "Start Serving",            condition: "Ticket called" },
-  { keyLabel: SHORTCUTS.RECALL.label,        action: "Recall Patient",           condition: "Ticket called" },
-  { keyLabel: SHORTCUTS.SKIP_NO_SHOW.label,  action: "Skip / No-Show",           condition: "Ticket called" },
-  { keyLabel: SHORTCUTS.COMPLETE.label,      action: "Complete Service",         condition: "Ticket serving" },
-  { keyLabel: SHORTCUTS.TRANSFER.label,      action: "Transfer Patient",         condition: "Any active ticket" },
-  { keyLabel: SHORTCUTS.SHORTCUT_HELP.label, action: "Show / Hide This Panel",   condition: "Always" },
-  { keyLabel: SHORTCUTS.ESCAPE.label,        action: "Close Dialog / Panel",     condition: "When open" },
-];
-
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -40,6 +31,19 @@ interface ShortcutReferencePanelProps {
 }
 
 export function ShortcutReferencePanel({ onClose }: ShortcutReferencePanelProps) {
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
+
+  const ROWS: ShortcutRowEntry[] = [
+    { keyLabel: SHORTCUTS.CALL_NEXT.label,     action: t.scCallNext,       condition: t.scCondNoActive },
+    { keyLabel: SHORTCUTS.START_SERVING.label, action: t.scStartServing,   condition: t.scCondCalled },
+    { keyLabel: SHORTCUTS.RECALL.label,        action: t.scRecall,         condition: t.scCondCalled },
+    { keyLabel: SHORTCUTS.SKIP_NO_SHOW.label,  action: t.scSkipNoShow,     condition: t.scCondCalled },
+    { keyLabel: SHORTCUTS.COMPLETE.label,      action: t.scComplete,       condition: t.scCondServing },
+    { keyLabel: SHORTCUTS.TRANSFER.label,      action: t.scTransfer,       condition: t.scCondAnyActive },
+    { keyLabel: SHORTCUTS.SHORTCUT_HELP.label, action: t.scShowPanel,      condition: t.scCondAlways },
+    { keyLabel: SHORTCUTS.ESCAPE.label,        action: t.scCloseDialog,    condition: t.scCondWhenOpen },
+  ];
   // Escape key handled by useKeyboardShortcuts (onEscape → closes panel).
   // We also handle it here as a direct fallback for the panel itself.
   useEffect(() => {
@@ -71,7 +75,7 @@ export function ShortcutReferencePanel({ onClose }: ShortcutReferencePanelProps)
         <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2">
             <Keyboard size={14} className="text-primary" />
-            <span className="text-sm font-semibold text-foreground">Keyboard Shortcuts</span>
+            <span className="text-sm font-semibold text-foreground">{t.shortcutReference}</span>
           </div>
           <button
             type="button"
@@ -115,7 +119,7 @@ export function ShortcutReferencePanel({ onClose }: ShortcutReferencePanelProps)
             <kbd className="inline-flex items-center rounded border border-border bg-secondary px-1 font-mono text-[10px]">
               Esc
             </kbd>{" "}
-            to close
+            {t.scFooter}
           </p>
         </div>
       </Card>

@@ -8,18 +8,20 @@
 
 import { Clock, SignalLow, WifiOff } from "lucide-react";
 import { useNetworkHealthContext } from "../providers/NetworkHealthContext";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings from "../lib/i18n";
 import { cn } from "../lib/utils";
 
 /* -------------------------------------------------------------------------- */
 /*  Timestamp helper                                                          */
 /* -------------------------------------------------------------------------- */
 
-function formatRelativeTime(date: Date): string {
+function formatRelativeTime(date: Date, justNowLabel: string): string {
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diffSec <= 0) return "just now";
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec <= 0) return justNowLabel;
+  if (diffSec < 60) return `${diffSec}s`;
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return `${diffMin}m`;
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -34,6 +36,8 @@ interface OfflineBannerProps {
 
 export function OfflineBanner({ lastRefreshedAt }: OfflineBannerProps) {
   const { networkStatus } = useNetworkHealthContext();
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
 
   // Nothing to render when the connection is healthy.
   if (networkStatus === "online") return null;
@@ -59,16 +63,9 @@ export function OfflineBanner({ lastRefreshedAt }: OfflineBannerProps) {
       )}
 
       {/* Message body */}
-      <div className="flex flex-1 flex-col gap-0.5">
-        <span className="font-semibold leading-none">
-          {isOffline ? "Connection Lost" : "Degraded Connection"}
-        </span>
-        <span className="text-xs opacity-70 leading-snug">
-          {isOffline
-            ? "Cannot reach the server. Actions are disabled. Reconnecting automatically…"
-            : "Server is reachable but real-time updates are unavailable. Data may be stale."}
-        </span>
-      </div>
+      <span className="flex-1 font-medium leading-snug">
+        {isOffline ? t.connectionLost : t.degradedConnection}
+      </span>
 
       {/* Last-updated timestamp — shows how old the queue data is */}
       {lastRefreshedAt && (
@@ -79,10 +76,10 @@ export function OfflineBanner({ lastRefreshedAt }: OfflineBannerProps) {
               ? "bg-red-500/10 text-red-400"
               : "bg-amber-500/10 text-amber-500",
           )}
-          title="Last queue data refresh"
+          title={t.lastUpdated}
         >
           <Clock size={10} aria-hidden="true" />
-          {formatRelativeTime(lastRefreshedAt)}
+          {formatRelativeTime(lastRefreshedAt, t.justNow)}
         </span>
       )}
     </div>

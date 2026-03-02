@@ -25,6 +25,9 @@ import { ShortcutReferencePanel } from "./ShortcutReferencePanel";
 import { OfflineBanner } from "./OfflineBanner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useNetworkHealthContext } from "../providers/NetworkHealthContext";
+import { useLanguage } from "../providers/LanguageContext";
+import dashboardStrings from "../lib/i18n";
+import type { DashboardStrings } from "../lib/i18n";
 import { cn } from "../lib/utils";
 import type { QueueTicket, WaitingTicket } from "../data/types";
 import {
@@ -49,11 +52,9 @@ function getPriority(weight: number): Priority {
   return "normal";
 }
 
-const PRIORITY_LABEL: Record<Priority, string> = {
-  emergency: "Emergency",
-  vip: "VIP",
-  normal: "Normal",
-};
+function getPriorityLabel(priority: Priority, t: DashboardStrings): string {
+  return t[priority];
+}
 
 const PRIORITY_BADGE_CLASS: Record<Priority, string> = {
   emergency:
@@ -62,7 +63,7 @@ const PRIORITY_BADGE_CLASS: Record<Priority, string> = {
   normal: "bg-secondary text-muted-foreground",
 };
 
-function PriorityBadge({ weight, className }: { weight: number; className?: string }) {
+function PriorityBadge({ weight, t, className }: { weight: number; t: DashboardStrings; className?: string }) {
   const priority = getPriority(weight);
   if (priority === "normal") return null;
   return (
@@ -73,7 +74,7 @@ function PriorityBadge({ weight, className }: { weight: number; className?: stri
         className,
       )}
     >
-      {PRIORITY_LABEL[priority]}
+      {getPriorityLabel(priority, t)}
     </span>
   );
 }
@@ -141,7 +142,7 @@ interface MetricCardProps {
 
 function MetricCard({ icon, label, value, accent }: MetricCardProps) {
   return (
-    <Card className="flex flex-1 items-center gap-3 px-4 py-3">
+    <Card className="flex flex-1 items-center gap-3 px-4 py-3" role="status" aria-label={`${label}: ${value}`}>
       <div
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary",
@@ -169,18 +170,19 @@ function MetricCard({ icon, label, value, accent }: MetricCardProps) {
 interface CurrentTicketCardProps {
   ticket: QueueTicket | null | undefined;
   timer: string;
+  t: DashboardStrings;
   /** ActionPanel content slotted into the bottom of the card. */
   actions: React.ReactNode;
 }
 
-function CurrentTicketCard({ ticket, timer, actions }: CurrentTicketCardProps) {
+function CurrentTicketCard({ ticket, timer, t, actions }: CurrentTicketCardProps) {
   if (!ticket) {
     return (
-      <Card className="flex flex-1 flex-col overflow-hidden">
+      <Card className="flex flex-1 flex-col overflow-hidden" role="region" aria-label={t.counterReady}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
           <MonitorCheck size={32} className="text-muted-foreground/30" />
-          <p className="text-sm font-medium text-foreground">Counter ready</p>
-          <p className="text-xs text-muted-foreground">No active ticket</p>
+          <p className="text-sm font-medium text-foreground">{t.counterReady}</p>
+          <p className="text-xs text-muted-foreground">{t.noActiveTicket}</p>
         </div>
         {actions}
       </Card>
@@ -191,6 +193,9 @@ function CurrentTicketCard({ ticket, timer, actions }: CurrentTicketCardProps) {
 
   return (
     <Card
+      role="region"
+      aria-label={`${t.statusServing} ${ticket.ticketNumber}`}
+      aria-live="polite"
       className={cn(
         "flex flex-1 flex-col gap-0 overflow-hidden",
         priority === "emergency" && "ring-1 ring-red-500/40",
@@ -213,14 +218,14 @@ function CurrentTicketCard({ ticket, timer, actions }: CurrentTicketCardProps) {
         <div className="flex items-center gap-2">
           {ticket.status === "SERVING" ? (
             <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-500 ring-1 ring-blue-500/25">
-              Serving
+              {t.statusServing}
             </span>
           ) : (
             <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-500 ring-1 ring-amber-400/30">
-              Called
+              {t.statusCalled}
             </span>
           )}
-          <PriorityBadge weight={ticket.priorityWeight} />
+          <PriorityBadge weight={ticket.priorityWeight} t={t} />
         </div>
 
         {/* Ticket number — hero */}
@@ -256,9 +261,10 @@ function CurrentTicketCard({ ticket, timer, actions }: CurrentTicketCardProps) {
 interface WaitingListProps {
   tickets: WaitingTicket[];
   isLoading: boolean;
+  t: DashboardStrings;
 }
 
-function WaitingList({ tickets, isLoading }: WaitingListProps) {
+function WaitingList({ tickets, isLoading, t }: WaitingListProps) {
   return (
     <Card className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
@@ -266,7 +272,7 @@ function WaitingList({ tickets, isLoading }: WaitingListProps) {
         <div className="flex items-center gap-2">
           <Users size={13} className="text-muted-foreground/60" />
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Waiting
+            {t.waitingHeader}
           </span>
         </div>
         {isLoading && <Spinner size={12} className="text-muted-foreground/50" />}
@@ -277,15 +283,15 @@ function WaitingList({ tickets, isLoading }: WaitingListProps) {
         {tickets.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1.5 py-10">
             <CheckCircle2 size={24} className="text-emerald-500/40" />
-            <p className="text-xs text-muted-foreground/60">Queue is empty</p>
+            <p className="text-xs text-muted-foreground/60">{t.queueEmpty}</p>
           </div>
         ) : (
           <ul className="divide-y divide-border/40">
-            {tickets.map((t, idx) => {
-              const priority = getPriority(t.priorityWeight);
+            {tickets.map((ticket, idx) => {
+              const priority = getPriority(ticket.priorityWeight);
               return (
                 <li
-                  key={t.id}
+                  key={ticket.id}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors"
                 >
                   {/* Position number */}
@@ -301,22 +307,21 @@ function WaitingList({ tickets, isLoading }: WaitingListProps) {
                       priority === "vip" && "bg-amber-400",
                       priority === "normal" && "bg-muted-foreground/30",
                     )}
-                    // aria-label={PRIORITY_LABEL[priority]}
                     aria-hidden="true"
                   />
-                   <span className="sr-only">{PRIORITY_LABEL[priority]} priority</span>
+                   <span className="sr-only">{getPriorityLabel(priority, t)} priority</span>
 
                   {/* Ticket number */}
                   <span className="flex-1 font-mono text-sm font-semibold tabular-nums text-foreground">
-                    {t.ticketNumber}
+                    {ticket.ticketNumber}
                   </span>
 
                   {/* Priority badge (non-normal only) */}
-                  <PriorityBadge weight={t.priorityWeight} />
+                  <PriorityBadge weight={ticket.priorityWeight} t={t} />
 
                   {/* Wait time */}
                   <span className="text-[10px] tabular-nums text-muted-foreground/60 shrink-0">
-                    {relativeTime(t.createdAt)}
+                    {relativeTime(ticket.createdAt)}
                   </span>
                 </li>
               );
@@ -375,6 +380,68 @@ function resolveQueueErrorMessage(error: { code?: string; message?: string }): s
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Loading skeletons                                                         */
+/* -------------------------------------------------------------------------- */
+
+function SkeletonPulse({ className }: { className?: string }) {
+  return <div className={cn("animate-pulse rounded-md bg-muted/60", className)} />;
+}
+
+function SkeletonDashboard() {
+  return (
+    <>
+      {/* Metric cards skeleton */}
+      <div className="flex gap-3 shrink-0">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="flex flex-1 items-center gap-3 px-4 py-3">
+            <SkeletonPulse className="h-8 w-8 rounded-lg" />
+            <div className="space-y-1.5">
+              <SkeletonPulse className="h-2.5 w-12" />
+              <SkeletonPulse className="h-5 w-8" />
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Main area skeleton */}
+      <div className="flex flex-1 gap-3 overflow-hidden">
+        {/* Serving card skeleton */}
+        <Card className="flex w-[55%] shrink-0 flex-col items-center justify-center gap-4 py-10">
+          <SkeletonPulse className="h-5 w-20 rounded-full" />
+          <SkeletonPulse className="h-14 w-36" />
+          <SkeletonPulse className="h-4 w-16" />
+          <div className="mt-4 w-full space-y-2 px-8">
+            <SkeletonPulse className="h-10 w-full rounded-lg" />
+            <div className="flex gap-2">
+              <SkeletonPulse className="h-8 flex-1 rounded-lg" />
+              <SkeletonPulse className="h-8 flex-1 rounded-lg" />
+            </div>
+          </div>
+        </Card>
+
+        {/* Waiting list skeleton */}
+        <Card className="flex flex-1 flex-col overflow-hidden">
+          <div className="border-b border-border/50 px-4 py-2.5">
+            <SkeletonPulse className="h-3 w-16" />
+          </div>
+          <div className="space-y-0">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                <SkeletonPulse className="h-3 w-4" />
+                <SkeletonPulse className="h-1.5 w-1.5 rounded-full" />
+                <SkeletonPulse className="h-4 w-16" />
+                <div className="flex-1" />
+                <SkeletonPulse className="h-3 w-8" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  QueueDashboard                                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -401,6 +468,10 @@ export function QueueDashboard() {
     transferError,
     clearTransferError,
   } = useQueue();
+
+  /* ---- Language --------------------------------------------------------- */
+  const { lang } = useLanguage();
+  const t = dashboardStrings[lang];
 
   /* ---- Network health (offline / degraded mode) ------------------------- */
   const { networkStatus } = useNetworkHealthContext();
@@ -472,7 +543,7 @@ export function QueueDashboard() {
   );
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+    <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4 animate-fade-in">
       {/* Offline / degraded network banner */}
       <OfflineBanner lastRefreshedAt={lastRefreshedAt} />
 
@@ -500,28 +571,28 @@ export function QueueDashboard() {
       )}
 
       {/* Summary metrics */}
-      <div className="flex gap-3 shrink-0">
+      <div className="flex gap-3 shrink-0 animate-slide-up">
         <MetricCard
           icon={<Users size={15} className="text-primary" />}
-          label="Waiting"
+          label={t.waiting}
           value={summary?.waitingCount ?? 0}
           accent="bg-primary/10"
         />
         <MetricCard
           icon={<MonitorCheck size={15} className="text-blue-500" />}
-          label="Serving"
+          label={t.serving}
           value={summary?.servingCount ?? 0}
           accent="bg-blue-500/10"
         />
         <MetricCard
           icon={<CheckCircle2 size={15} className="text-emerald-500" />}
-          label="Done today"
+          label={t.doneToday}
           value={summary?.completedToday ?? 0}
           accent="bg-emerald-500/10"
         />
         <MetricCard
           icon={<XCircle size={15} className="text-amber-500" />}
-          label="No-shows"
+          label={t.noShows}
           value={summary?.noShowsToday ?? 0}
           accent="bg-amber-500/10"
         />
@@ -529,9 +600,7 @@ export function QueueDashboard() {
 
       {/* Main area: serving card + waiting list */}
       {isLoading && !summary ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner size={24} className="text-primary/40" />
-        </div>
+        <SkeletonDashboard />
       ) : (
         <div className="flex flex-1 gap-3 overflow-hidden">
           {/* Currently serving + actions — takes ~55% width */}
@@ -539,6 +608,7 @@ export function QueueDashboard() {
             <CurrentTicketCard
               ticket={currentTicket}
               timer={timer}
+              t={t}
               actions={
                 <ActionPanel
                   currentTicket={currentTicket}
@@ -546,6 +616,7 @@ export function QueueDashboard() {
                   isActionInFlight={isActionInFlight}
                   actionError={actionError}
                   isOffline={isOffline}
+                  t={t}
                   onCallNext={() => void callNext()}
                   onStartServing={() => void startServing()}
                   onRecall={() => void recall()}
@@ -560,7 +631,7 @@ export function QueueDashboard() {
 
           {/* Waiting list — takes remaining width */}
           <div className="flex flex-1 flex-col overflow-hidden">
-            <WaitingList tickets={waitingTickets} isLoading={isLoading} />
+            <WaitingList tickets={waitingTickets} isLoading={isLoading} t={t} />
           </div>
         </div>
       )}
@@ -588,7 +659,7 @@ export function QueueDashboard() {
       {!isTransferDialogOpen && transferError && (
         <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-500">
           <ArrowRightLeft size={14} className="shrink-0" />
-          <span className="flex-1">{transferError.message ?? "Transfer failed"}</span>
+          <span className="flex-1">{transferError.message ?? t.errActionFailed}</span>
           <button
             type="button"
             onClick={clearTransferError}

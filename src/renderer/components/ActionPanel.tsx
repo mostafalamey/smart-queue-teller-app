@@ -19,6 +19,7 @@ import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 import { cn } from "../lib/utils";
 import type { ApiError, QueueTicket } from "../data/types";
+import type { DashboardStrings } from "../lib/i18n";
 import {
   PhoneCall,
   Play,
@@ -46,6 +47,8 @@ export interface ActionPanelProps {
    * shown. Set by the caller from NetworkHealthContext ("offline" status).
    */
   isOffline?: boolean;
+  /** Bilingual strings for labels. */
+  t: DashboardStrings;
   onCallNext(): void;
   onStartServing(): void;
   onRecall(): void;
@@ -64,22 +67,22 @@ export interface ActionPanelProps {
 /*  Error message resolver                                                    */
 /* -------------------------------------------------------------------------- */
 
-function resolveActionError(error: ApiError): string {
+function resolveActionError(error: ApiError, t: DashboardStrings): string {
   switch (error.code) {
     case "QUEUE_EMPTY":
-      return "No patients waiting in queue";
+      return t.errQueueEmpty;
     case "TICKET_NOT_FOUND":
-      return "Ticket no longer exists — queue state refreshed";
+      return t.errTicketNotFound;
     case "INVALID_STATUS_TRANSITION":
-      return "Action not available for the current ticket status";
+      return t.errInvalidTransition;
     case "STATION_NOT_FOUND":
-      return "Station binding error — contact IT";
+      return t.errStationNotFound;
     case "FORBIDDEN":
-      return "Service mismatch or insufficient permissions for this station";
+      return t.errForbidden;
     case "ACTIVE_TICKET_EXISTS":
-      return "You already have an active ticket at this station";
+      return t.errActiveTicketExists;
     default:
-      return error.message || "Action failed";
+      return error.message || t.errActionFailed;
   }
 }
 
@@ -105,6 +108,7 @@ export function ActionPanel({
   isActionInFlight,
   actionError,
   isOffline = false,
+  t,
   onCallNext,
   onStartServing,
   onRecall,
@@ -196,7 +200,7 @@ export function ActionPanel({
       {actionError && (
         <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-500">
           <AlertCircle size={12} className="shrink-0" />
-          <span>{resolveActionError(actionError)}</span>
+          <span>{resolveActionError(actionError, t)}</span>
         </div>
       )}
 
@@ -204,11 +208,7 @@ export function ActionPanel({
       {confirmingSkip ? (
         <div className="flex flex-col gap-2">
           <p className="text-center text-xs font-medium text-muted-foreground">
-            Mark{" "}
-            <span className="font-semibold text-foreground">
-              {confirmingSkipFor.ticketNumber}
-            </span>{" "}
-            as No-Show?
+            {t.confirmNoShowPrompt(confirmingSkipFor.ticketNumber)}
           </p>
           <div className="flex gap-2">
             <Button
@@ -219,7 +219,7 @@ export function ActionPanel({
               onClick={handleSkipConfirm}
             >
               {showBusy ? <Spinner size={14} /> : <UserX size={14} />}
-              Confirm No-Show
+              {t.confirmNoShow}
             </Button>
             <Button
               variant="ghost"
@@ -228,7 +228,7 @@ export function ActionPanel({
               disabled={disabled}
               onClick={() => setConfirmingSkipFor(null)}
             >
-              Cancel
+              {t.cancel}
             </Button>
           </div>
         </div>
@@ -241,7 +241,7 @@ export function ActionPanel({
           onClick={handleCallNext}
         >
           {showBusy ? <Spinner size={16} /> : <PhoneCall size={16} />}
-          Call Next
+          {t.callNext}
           <Key label="F1" />
         </Button>
       ) : isCalled ? (
@@ -254,7 +254,7 @@ export function ActionPanel({
             onClick={handleStartServing}
           >
             {showBusy ? <Spinner size={16} /> : <Play size={16} />}
-            Start Serving
+            {t.startServing}
             <Key label="F2" />
           </Button>
 
@@ -270,7 +270,7 @@ export function ActionPanel({
               onClick={handleRecall}
             >
               <Volume2 size={13} />
-              Recall
+              {t.recall}
               <Key label="F3" />
             </Button>
 
@@ -291,7 +291,7 @@ export function ActionPanel({
               }
             >
               <UserX size={13} />
-              No-Show
+              {t.noShow}
               <Key label="F4" />
             </Button>
           </div>
@@ -307,7 +307,7 @@ export function ActionPanel({
             onClick={onTransfer}
           >
             <ArrowRightLeft size={13} />
-            Transfer
+            {t.transfer}
             <Key label="F6" />
           </Button>
         </>
@@ -322,7 +322,7 @@ export function ActionPanel({
             onClick={handleComplete}
           >
             {showBusy ? <Spinner size={16} /> : <CheckCircle2 size={16} />}
-            Complete
+            {t.complete}
             <Key label="F5" />
           </Button>
 
@@ -337,7 +337,7 @@ export function ActionPanel({
             onClick={onTransfer}
           >
             <ArrowRightLeft size={13} />
-            Transfer
+            {t.transfer}
             <Key label="F6" />
           </Button>
         </>
