@@ -82,6 +82,10 @@ export interface QueueTicket {
   createdAt: string;
   /** Origin ticket (set when this ticket resulted from a transfer) */
   originTicketId?: string;
+  /** Patient contact — partially masked in the UI (e.g. 05****1234) */
+  patientPhone?: string;
+  /** Recall timestamp — set to the occurredAt of the latest RECALLED event */
+  lastRecalledAt?: string;
 }
 
 export interface QueueSummary {
@@ -90,6 +94,10 @@ export interface QueueSummary {
   calledCount: number;
   servingCount: number;
   nowServing?: QueueTicket;
+  /** Tickets completed today (midnight-scoped) */
+  completedToday?: number;
+  /** No-shows today (midnight-scoped) */
+  noShowsToday?: number;
 }
 
 export interface WaitingTicket {
