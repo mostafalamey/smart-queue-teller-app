@@ -220,8 +220,9 @@ export interface TellerDataProvider {
   getWaitingTickets(serviceId: string): Promise<WaitingTicket[]>;
 
   /* Teller actions */
-  callNext(serviceId: string): Promise<QueueTicket>;         // also fires startServing internally
-  recall(ticketId: string): Promise<QueueTicket>;            // also re-fires startServing internally
+  callNext(serviceId: string): Promise<QueueTicket>;         // returns CALLED ticket
+  startServing(ticketId: string): Promise<QueueTicket>;      // explicit user action: CALLED → SERVING
+  recall(ticketId: string): Promise<QueueTicket>;            // RECALLED event only; status unchanged
   skipNoShow(ticketId: string): Promise<QueueTicket>;
   complete(ticketId: string): Promise<QueueTicket>;
   transfer(input: TransferInput): Promise<TransferResult>;

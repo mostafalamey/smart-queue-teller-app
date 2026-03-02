@@ -1,5 +1,5 @@
 /**
- * QueueDashboard — primary teller view for Phase 6.3.
+ * QueueDashboard — primary teller view.
  *
  * Layout:
  *   ┌──────────────────────────────────────────────────┐
@@ -7,18 +7,19 @@
  *   ├────────────────────────┬─────────────────────────┤
  *   │  Currently Serving     │  Waiting Queue          │
  *   │  (hero ticket display) │  (scrollable list)      │
+ *   ├────────────────────────┤                         │
+ *   │  Action Panel          │                         │
  *   └────────────────────────┴─────────────────────────┘
  *
  * Data: sourced entirely from useQueue() — no props.
  * Real-time: socket events trigger re-fetches inside useQueue.
- *
- * Phase 6.4 will mount the ActionPanel below the CurrentTicket card here.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { Card } from "./ui/card";
 import { Spinner } from "./ui/spinner";
 import { useQueue } from "../hooks/useQueue";
+import { ActionPanel } from "./ActionPanel";
 import { cn } from "../lib/utils";
 import type { QueueTicket, WaitingTicket } from "../data/types";
 import {
@@ -162,15 +163,20 @@ function MetricCard({ icon, label, value, accent }: MetricCardProps) {
 interface CurrentTicketCardProps {
   ticket: QueueTicket | null | undefined;
   timer: string;
+  /** ActionPanel content slotted into the bottom of the card. */
+  actions: React.ReactNode;
 }
 
-function CurrentTicketCard({ ticket, timer }: CurrentTicketCardProps) {
+function CurrentTicketCard({ ticket, timer, actions }: CurrentTicketCardProps) {
   if (!ticket) {
     return (
-      <Card className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
-        <MonitorCheck size={32} className="text-muted-foreground/30" />
-        <p className="text-sm font-medium text-foreground">Counter ready</p>
-        <p className="text-xs text-muted-foreground">No active ticket</p>
+      <Card className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
+          <MonitorCheck size={32} className="text-muted-foreground/30" />
+          <p className="text-sm font-medium text-foreground">Counter ready</p>
+          <p className="text-xs text-muted-foreground">No active ticket</p>
+        </div>
+        {actions}
       </Card>
     );
   }
@@ -232,14 +238,7 @@ function CurrentTicketCard({ ticket, timer }: CurrentTicketCardProps) {
         )}
       </div>
 
-      {/* Phase 6.4: ActionPanel mounts here.
-           CALLED  → primary action is Start Serving
-           SERVING → actions are Recall, Skip, Complete, Transfer */}
-      <div className="border-t border-border/50 px-4 py-3">
-        <p className="text-center text-[10px] text-muted-foreground/40 uppercase tracking-widest">
-          Action panel — Phase 6.4
-        </p>
-      </div>
+      {actions}
     </Card>
   );
 }
@@ -377,12 +376,21 @@ export function QueueDashboard() {
   const {
     summary,
     waitingTickets,
+    currentTicket,
     isLoading,
     error,
+    isActionInFlight,
+    actionError,
+    serviceId,
     refresh,
+    callNext,
+    startServing,
+    recall,
+    skipNoShow,
+    complete,
   } = useQueue();
 
-  const timer = useServingTimer(summary?.nowServing);
+  const timer = useServingTimer(currentTicket);
 
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
@@ -429,9 +437,25 @@ export function QueueDashboard() {
         </div>
       ) : (
         <div className="flex flex-1 gap-3 overflow-hidden">
-          {/* Currently serving — takes ~55% width */}
+          {/* Currently serving + actions — takes ~55% width */}
           <div className="flex w-[55%] shrink-0 flex-col">
-            <CurrentTicketCard ticket={summary?.nowServing} timer={timer} />
+            <CurrentTicketCard
+              ticket={currentTicket}
+              timer={timer}
+              actions={
+                <ActionPanel
+                  currentTicket={currentTicket}
+                  serviceId={serviceId}
+                  isActionInFlight={isActionInFlight}
+                  actionError={actionError}
+                  onCallNext={() => void callNext()}
+                  onStartServing={() => void startServing()}
+                  onRecall={() => void recall()}
+                  onSkipNoShow={() => void skipNoShow()}
+                  onComplete={() => void complete()}
+                />
+              }
+            />
           </div>
 
           {/* Waiting list — takes remaining width */}
