@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, session } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, safeStorage, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -204,9 +204,11 @@ function createWindow(): void {
     width: WINDOW_DEFAULT_WIDTH,
     height: WINDOW_DEFAULT_HEIGHT,
     minWidth: 628,
-    minHeight: 520,
+    minHeight: 580,
     alwaysOnTop: true,
-    icon: path.join(__dirname, "..", "build-resources", "icon.ico"),
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, "icon.ico")
+      : path.join(__dirname, "..", "build-resources", "icon.ico"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -266,18 +268,12 @@ app.whenReady().then(() => {
   if (isDev) {
     connectSrcHosts = "http://localhost:* ws://localhost:*";
   } else {
-    const apiBaseUrl = process.env.API_BASE_URL;
-    if (!apiBaseUrl) {
-      dialog.showErrorBox(
-        "Configuration Error",
-        "API_BASE_URL environment variable must be set in production.\nThe application cannot start without it."
-      );
-      app.exit(1);
-      // Unreachable — app.exit() terminates the process synchronously via the event loop,
-      // but TypeScript doesn't know that, so throw to satisfy the definite-assignment check.
-      throw new Error("API_BASE_URL is required in production");
-    }
-    connectSrcHosts = apiBaseUrl;
+    // Default to localhost:3000 — IT can override by setting API_BASE_URL
+    // before launching the app (e.g. via a wrapper batch file or system env var).
+    const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:3000";
+    // Derive the ws:// counterpart from the http(s):// base URL.
+    const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
+    connectSrcHosts = `${apiBaseUrl} ${wsBaseUrl}`;
   }
 
   const csp = [

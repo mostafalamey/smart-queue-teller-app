@@ -43,10 +43,33 @@ This starts Vite dev server on port 5174 and launches Electron loading from it.
 ### Build
 
 ```bash
-npm run build:web     # Build the web assets
-npm run pack          # Unpacked Electron build
-npm run dist:win      # Windows NSIS installer
+npm run build:web     # Type-check + Vite renderer + compile main process (dist/ + dist-main/)
+npm run pack          # Unpacked Electron build → release/win-unpacked/
+npm run dist:win      # Windows NSIS installer + portable exe → release/
 ```
+
+### Packaging / Distribution
+
+The build pipeline uses two steps:
+
+1. **Renderer** — Vite bundles `src/renderer/` → `dist/`
+2. **Main process** — esbuild compiles `src/main.ts` → `dist-main/main.js`
+
+`electron-builder` then packages both into an ASAR archive and wraps it with Electron.
+
+**Windows requirements for `dist:win`:**
+
+- **Developer Mode must be enabled** (Settings → System → For developers → Developer Mode).  
+  Without it, the ASAR integrity embedding step fails with a symlink permission error.  
+  The unpacked app (`--dir`) still builds correctly either way.
+- No code-signing certificate is required for internal distribution.
+
+**Output artifacts:**
+
+| File | Description |
+|---|---|
+| `release/Smart-Queue-Teller-Setup-{version}.exe` | NSIS installer (recommended) |
+| `release/Smart-Queue-Teller-Portable-{version}.exe` | Portable — runs without installation |
 
 ### Environment Variables
 

@@ -663,22 +663,24 @@ Backend teller mutation
     - Concurrent tellers on same service (one wins call-next)
     - Network disconnect → reconnect → state recovery
     - All keyboard shortcuts
-- [ ] **Packaging & distribution**:
+- [x] **Packaging & distribution**:
   - `electron-builder` config for Windows NSIS installer
-  - App icon (Smart Queue Teller branding)
-  - Installer produces `Smart-Queue-Teller-Setup-{version}.exe`
-  - Auto-update mechanism (deferred — manual updates via MSI/EXE for v1)
-  - Portable build option (`.exe` without installer)
+  - App icon (`build-resources/icon.ico`) embedded into exe via `scripts/after-pack.cjs` + `rcedit` (no Developer Mode required)
+  - NSIS installer produces `Smart-Queue-Teller-Setup-{version}.exe` (95 MB, verified ✅)
+  - Start menu + desktop shortcuts via NSIS config
+  - Main process compile step: `esbuild src/main.ts → dist-electron/main.js` + `preload.cjs` copied alongside — fixes packaged-app preload path
+  - `win.signAndEditExecutable: false` prevents winCodeSign symlink errors; icon embedded separately via `afterPack` hook
+  - Auto-update mechanism (deferred — manual updates via NSIS installer for v1)
 - [x] **Documentation**:
   - Update `README.md` with build/run instructions (existing)
   - Update `docs/teller-app-implementation-plan.md` status fields (this update)
   - Shortcut reference panel available in-app via F12 (Phase 6.6, bilingual in Phase 6.8)
 
 #### Done Criteria
-- ~~All unit and integration tests passing.~~ (Testing deferred to separate phase)
-- ~~Manual test scenarios verified.~~ (Testing deferred to separate phase)
-- ~~Windows installer builds cleanly.~~ (Packaging deferred to separate phase)
-- ~~App installs and runs on a fresh Windows PC.~~ (Packaging deferred to separate phase)
+- ~~All unit and integration tests passing.~~ (Integration tests deferred)
+- ~~Manual test scenarios verified.~~ (Manual testing deferred)
+- Windows installer builds cleanly. ✅ (`Smart-Queue-Teller-Setup-0.1.0.exe` — 95 MB, custom icon embedded)
+- ~~App installs and runs on a fresh Windows PC.~~ (Install verification deferred)
 - Arabic/English toggles correctly with RTL support. ✅
 
 ---
@@ -882,7 +884,7 @@ Update this table as implementation proceeds.
 | 6.5 | Transfer Flow | Done | 2026-03-02 | 2026-03-02 |
 | 6.6 | Keyboard Shortcuts & Peripheral Support | Done | 2026-03-02 | 2026-03-02 |
 | 6.7 | Error Handling, Offline States & Edge Cases | Done | 2026-03-02 | 2026-03-02 |
-| 6.8 | Polish, Testing & Packaging | Not Started | | |
+| 6.8 | Polish, Testing & Packaging | Done | 2026-03-03 | 2026-03-03 |
 
 ---
 
