@@ -280,7 +280,7 @@ describe("createAuthProvider", () => {
       expect(body.refreshToken).toBe("my-refresh-token");
     });
 
-    it("silently ignores server errors (fire-and-forget pattern)", async () => {
+    it("propagates server errors (caller may swallow in fire-and-forget flows)", async () => {
       fetchSpy.mockResolvedValueOnce(makeErrResponse({ code: "UNKNOWN" }, 500));
 
       const provider = createAuthProvider(BASE_URL);

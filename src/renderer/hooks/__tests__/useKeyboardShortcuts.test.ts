@@ -173,7 +173,7 @@ describe("useKeyboardShortcuts", () => {
     };
     const { unmount } = mountHook(handlers, ALL_DISABLED);
     ["F1", "F2", "F3", "F4", "F5", "F6"].forEach(fireKey);
-    Object.values(handlers).forEach((h) => expect(h).not.toHaveBeenCalled());
+    Object.values(handlers).forEach((h) => {expect(h).not.toHaveBeenCalled()});
     unmount();
   });
 
