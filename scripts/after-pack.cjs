@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const rcedit = require("rcedit");
 
 module.exports = async (context) => {
   if (context.electronPlatformName !== "win32") {
@@ -27,11 +28,11 @@ module.exports = async (context) => {
   }
 
   try {
-    const { rcedit } = await import("rcedit");
     await rcedit(executablePath, { icon: iconPath });
     console.log(`[after-pack] Icon applied to ${executablePath}`);
   } catch (error) {
-    console.error(`[after-pack] Failed to apply icon: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[after-pack] Failed to apply icon: ${message}`);
     throw error;
   }
 };

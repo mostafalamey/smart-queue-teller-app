@@ -48,7 +48,7 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "jsdom": "^28.1.0",
-    "rcedit": "^5.0.2",
+    "rcedit": "^4.0.1",
     "stylelint": "^17.4.0",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.1.4",
