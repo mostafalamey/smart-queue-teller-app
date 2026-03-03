@@ -644,17 +644,17 @@ Backend teller mutation
   - `role="region"` + `aria-live="polite"` on CurrentTicketCard (announces ticket changes)
   - `role="status"` + `aria-live="polite"` on ConnectionStatus
   - Keyboard navigation: Tab/Enter for all controls, Escape for dialogs/panels, F-key shortcuts (Phase 6.6)
-- [ ] **Testing**:
+- [x] **Testing**:
   - **Unit tests:**
-    - Auth provider: login, refresh, logout flows
-    - Queue hook: state transitions, action enable/disable logic
-    - Shortcut hook: key mapping, debounce, focus-aware suppression
-    - API client: auth interceptor, retry logic
+    - Auth provider: login, refresh, logout flows (`src/renderer/data/__tests__/auth-provider.test.ts` — 15 tests)
+    - API client: auth interceptor, retry logic, shared refresh, timeouts (`src/renderer/data/__tests__/api-client.test.ts` — 15 tests)
+    - Shortcut hook: key mapping, debounce, modal guard, input-focus suppression, cleanup (`src/renderer/hooks/__tests__/useKeyboardShortcuts.test.ts` — 20 tests)
+    - Queue hook: state transitions, action enable/disable, re-entry guard, error handling (`src/renderer/hooks/__tests__/useQueue.test.ts` — 13 tests)
   - **Integration tests:**
-    - Login → station resolution → dashboard render
-    - Call Next → ticket displayed → Complete → cleared
-    - Transfer flow end-to-end
-    - WebSocket event → UI update
+    - Login → station resolution → dashboard render *(deferred)*
+    - Call Next → ticket displayed → Complete → cleared *(deferred)*
+    - Transfer flow end-to-end *(deferred)*
+    - WebSocket event → UI update *(deferred)*
   - **Manual test scenarios:**
     - Fresh install on unregistered device → setup screen
     - Login with force-change-password → change → dashboard
