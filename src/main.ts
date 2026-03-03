@@ -1,5 +1,14 @@
-import { app, BrowserWindow, ipcMain, protocol, safeStorage, session } from "electron";
+import dotenv from "dotenv";
 import path from "node:path";
+
+// Load API_BASE_URL (and other env overrides) for LAN / production deployments.
+// Resolution order (dotenv never overwrites already-set values):
+//   1. .env placed beside the .exe  — production: IT drops a .env next to the installer output.
+//   2. .env in process.cwd()        — development: project root .env / .env.example.
+dotenv.config({ path: path.join(path.dirname(process.execPath), ".env") });
+dotenv.config();
+
+import { app, BrowserWindow, ipcMain, protocol, safeStorage, session } from "electron";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
