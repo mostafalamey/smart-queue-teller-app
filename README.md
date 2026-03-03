@@ -43,10 +43,26 @@ This starts Vite dev server on port 5174 and launches Electron loading from it.
 ### Build
 
 ```bash
-npm run build:web     # Build the web assets
-npm run pack          # Unpacked Electron build
-npm run dist:win      # Windows NSIS installer
+npm run build:web     # Type-check + Vite renderer + compile main process (dist/ + dist-electron/)
+npm run pack          # Unpacked Electron build → release/win-unpacked/
+npm run dist:win      # Windows NSIS installer → release/
 ```
+
+### Packaging / Distribution
+
+The build pipeline compiles two targets:
+
+1. **Renderer** — Vite bundles `src/renderer/` → `dist/`
+2. **Main process** — esbuild compiles `src/main.ts` → `dist-electron/main.js` + copies `src/preload.cjs` → `dist-electron/preload.cjs`
+
+`electron-builder` packages both into an ASAR archive and produces a Windows NSIS installer. The app icon is embedded into the exe via `scripts/after-pack.cjs` (`rcedit`) — no code-signing certificate or Developer Mode required.
+
+**Output artifacts:**
+
+| File | Description |
+|---|---|
+| `release/Smart-Queue-Teller-Setup-{version}.exe` | NSIS installer |
+| `release/win-unpacked/Smart Queue Teller.exe` | Unpacked — run directly without installing |
 
 ### Environment Variables
 
