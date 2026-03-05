@@ -396,12 +396,12 @@ export function AuthProvider({
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
         await authProvider.changePassword(input, token);
-        // Mark mustChangePassword as resolved
+        // Mark mustChangePassword as resolved and persist name if provided
         setState((prev) => ({
           ...prev,
           isLoading: false,
           user: prev.user
-            ? { ...prev.user, mustChangePassword: false }
+            ? { ...prev.user, mustChangePassword: false, ...(input.name ? { name: input.name } : {}) }
             : null,
         }));
       } catch (err) {

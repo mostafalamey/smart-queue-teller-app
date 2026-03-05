@@ -37,6 +37,7 @@ export function ForcePasswordChange() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -63,7 +64,11 @@ export function ForcePasswordChange() {
     setValidationError(null);
 
     try {
-      await changePassword({ currentPassword, newPassword });
+      await changePassword({
+        currentPassword,
+        newPassword,
+        ...(displayName.trim() && { name: displayName.trim() }),
+      });
       // On success, AuthContext sets mustChangePassword = false
       // The parent App router will automatically redirect to the dashboard.
     } catch (err) {
@@ -115,6 +120,24 @@ export function ForcePasswordChange() {
         <div className="rounded-xl border border-border bg-card shadow-lg shadow-black/10">
           <div className="p-6">
             <form onSubmit={(e) => void handleSubmit(e)} noValidate>
+              {/* Display name (optional) */}
+              <div className="mb-4 space-y-1.5">
+                <Label htmlFor="display-name">Display Name</Label>
+                <Input
+                  id="display-name"
+                  type="text"
+                  autoComplete="name"
+                  autoFocus
+                  placeholder="e.g. Dr. Ahmad Ali"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  disabled={isLoading}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Optional — shown in the header instead of your email.
+                </p>
+              </div>
+
               {/* Current password */}
               <div className="mb-4 space-y-1.5">
                 <Label htmlFor="current-password">Current Password</Label>

@@ -70,7 +70,7 @@ function TellerApp() {
     <SocketProvider>
       <NetworkHealthProvider>
         <div className="flex h-screen flex-col bg-background text-foreground">
-          <StationInfo tellerName={user?.email} />
+          <StationInfo tellerName={user?.name || user?.email} />
           <QueueDashboard />
         </div>
       </NetworkHealthProvider>

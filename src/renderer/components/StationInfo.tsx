@@ -69,8 +69,13 @@ export function StationInfo({ tellerName, className }: StationInfoProps) {
     lang === "ar" ? binding.departmentNameAr : binding.departmentNameEn;
 
   const displayName = tellerName ?? "—";
-  // First character upper-cased for the avatar fallback
-  const initial = displayName.charAt(0).toUpperCase();
+  // Build 1–2 character initials from the display name
+  const initial = (() => {
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  })();
 
   return (
     <header
