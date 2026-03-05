@@ -35,6 +35,7 @@ export interface IssuedAuthTokens {
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string | null;
   role: AppRole;
   /** Only set when role is MANAGER */
   departmentId?: string;
@@ -62,6 +63,7 @@ export interface RefreshInput {
 export interface ChangePasswordInput {
   currentPassword: string;
   newPassword: string;
+  name?: string;
 }
 
 /* -------------------------------------------------------------------------- */

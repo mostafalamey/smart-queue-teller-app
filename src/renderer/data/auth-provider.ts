@@ -168,6 +168,7 @@ export function createAuthProvider(baseUrl: string): AuthProvider {
         {
           currentPassword: input.currentPassword,
           newPassword: input.newPassword,
+          ...(input.name ? { name: input.name } : {}),
         },
         accessToken,
       );
