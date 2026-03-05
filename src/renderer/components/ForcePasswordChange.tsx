@@ -67,7 +67,7 @@ export function ForcePasswordChange() {
       await changePassword({
         currentPassword,
         newPassword,
-        ...(displayName.trim() && { name: displayName.trim() }),
+        ...(displayName.trim() ? { name: displayName.trim() } : {}),
       });
       // On success, AuthContext sets mustChangePassword = false
       // The parent App router will automatically redirect to the dashboard.
@@ -127,7 +127,6 @@ export function ForcePasswordChange() {
                   id="display-name"
                   type="text"
                   autoComplete="name"
-                  autoFocus
                   placeholder="e.g. Dr. Ahmad Ali"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -146,6 +145,7 @@ export function ForcePasswordChange() {
                     id="current-password"
                     type={showCurrent ? "text" : "password"}
                     autoComplete="current-password"
+                    autoFocus
                     placeholder="••••••••"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
