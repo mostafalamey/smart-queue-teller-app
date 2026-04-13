@@ -13,8 +13,14 @@ export default defineConfig({
   },
   root: ".",
   server: {
-    port: 5174,
+    port: Number(process.env.VITE_PORT ?? 5174),
     strictPort: true,
+    watch: {
+      // Electron writes its userData files (Code Cache, GPUCache, DIPS, etc.)
+      // into teller-instance-* when --user-data-dir points inside the project root.
+      // Without this, Vite would detect every write and trigger a full page reload.
+      ignored: ["**/teller-instance-*/**"],
+    },
   },
   build: {
     outDir: "dist",
